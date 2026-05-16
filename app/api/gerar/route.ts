@@ -31,7 +31,16 @@ export async function POST(req: Request) {
             },
             {
               type: 'text',
-              text: 'Analise esta foto de um espaço comercial. Descreva em 3-4 frases: formato do ambiente (planta baixa aproximada), pé-direito, posição de janelas e portas, elementos fixos (colunas, pilares, escadas), e qualidade de luz natural. Seja objetivo e técnico.',
+              text: `Você é um arquiteto de interiores. Analise esta foto com máxima precisão arquitetônica e descreva:
+1. Formato da planta baixa (retangular, irregular, L-shape, etc.) e proporções aproximadas
+2. Pé-direito (baixo <2.5m / médio 2.5-3.5m / alto >3.5m) e características do teto
+3. Janelas: quantidade, posição nas paredes (frente/lateral/fundo), tamanho e altura do chão
+4. Portas: posição e quantidade
+5. Elementos estruturais fixos: colunas, pilares, vigas, escadas, mezanino
+6. Direção e qualidade da luz natural
+7. Ângulo e perspectiva da foto (frontal, diagonal, de canto, etc.)
+
+Seja preciso e técnico — esta descrição será usada para recriar o espaço fielmente em uma proposta de design.`,
             },
           ],
         }],

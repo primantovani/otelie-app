@@ -12,6 +12,7 @@ function ResultContent() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageLoading, setImageLoading] = useState(true)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   const parsed = raw ? JSON.parse(decodeURIComponent(raw)) : null
   const result: BriefResult = parsed?.result
@@ -27,7 +28,7 @@ function ResultContent() {
     fetch('/api/imagem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ result, form, photoBase64, spaceAnalysis }),
+      body: JSON.stringify({ result, form, spaceAnalysis }),
     })
       .then(r => r.json())
       .then(data => {
@@ -42,8 +43,6 @@ function ResultContent() {
     router.push('/')
     return null
   }
-
-  const [pdfLoading, setPdfLoading] = useState(false)
 
   async function handleDownload() {
     setPdfLoading(true)
@@ -84,23 +83,56 @@ function ResultContent() {
           </button>
         </div>
 
-        {/* Image */}
-        <div className="rounded-2xl overflow-hidden mb-6 bg-stone-100 aspect-video flex items-center justify-center">
-          {imageLoading ? (
-            <div className="flex flex-col items-center gap-2 text-stone-400">
-              <div className="w-6 h-6 border-2 border-stone-300 border-t-indigo-400 rounded-full animate-spin" />
-              <p className="text-xs">Gerando imagem do ambiente…</p>
+        {/* Before / After */}
+        {photoBase64 ? (
+          <div className="mb-6 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-video">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoBase64} alt="Antes" className="w-full h-full object-cover" />
+                <span className="absolute bottom-2 left-2 bg-black/50 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">Antes</span>
+              </div>
+              <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-video flex items-center justify-center">
+                {imageLoading ? (
+                  <div className="flex flex-col items-center gap-2 text-stone-400">
+                    <div className="w-5 h-5 border-2 border-stone-300 border-t-indigo-400 rounded-full animate-spin" />
+                    <p className="text-[10px]">Gerando…</p>
+                  </div>
+                ) : imageUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageUrl} alt="Depois" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-2 left-2 bg-indigo-600/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">Depois</span>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-red-400 px-2 text-center">{imageError ?? 'Indisponível'}</p>
+                )}
+              </div>
             </div>
-          ) : imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="Render do ambiente" className="w-full h-full object-cover" />
-          ) : (
-            <p className="text-xs text-red-400 px-4 text-center">{imageError ?? 'Imagem não disponível'}</p>
-          )}
-        </div>
+            {spaceAnalysis && (
+              <details className="text-xs text-stone-400 cursor-pointer">
+                <summary className="hover:text-stone-600 transition-colors">Ver análise do espaço real</summary>
+                <p className="mt-2 leading-relaxed bg-stone-50 rounded-xl p-3">{spaceAnalysis}</p>
+              </details>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl overflow-hidden mb-6 bg-stone-100 aspect-video flex items-center justify-center">
+            {imageLoading ? (
+              <div className="flex flex-col items-center gap-2 text-stone-400">
+                <div className="w-6 h-6 border-2 border-stone-300 border-t-indigo-400 rounded-full animate-spin" />
+                <p className="text-xs">Gerando imagem do ambiente…</p>
+              </div>
+            ) : imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt="Render do ambiente" className="w-full h-full object-cover" />
+            ) : (
+              <p className="text-xs text-red-400 px-4 text-center">{imageError ?? 'Imagem não disponível'}</p>
+            )}
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-          {/* Vibe tags */}
           <div className="px-8 pt-8 pb-6 border-b border-stone-100">
             <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Atmosfera</p>
             <div className="flex flex-wrap gap-2">
@@ -112,7 +144,6 @@ function ResultContent() {
             </div>
           </div>
 
-          {/* Palette */}
           <div className="px-8 py-6 border-b border-stone-100">
             <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Paleta de cores</p>
             <div className="flex gap-3 items-center">
@@ -128,7 +159,6 @@ function ResultContent() {
             </div>
           </div>
 
-          {/* Sections */}
           <div className="divide-y divide-stone-100">
             {[
               { icon: '💡', label: 'Iluminação', text: result.lighting },
@@ -146,11 +176,11 @@ function ResultContent() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="mt-6 flex gap-3">
           <button
             onClick={handleDownload}
-            className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors"
+            disabled={imageLoading || pdfLoading}
+            className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
             {pdfLoading ? 'Gerando PDF…' : 'Baixar PDF'}
           </button>
@@ -158,11 +188,11 @@ function ResultContent() {
             onClick={() => router.push('/')}
             className="flex-1 py-3 rounded-xl border border-stone-200 text-stone-600 font-semibold text-sm hover:bg-stone-50 transition-colors"
           >
-            Refinar ou recomeçar
+            Novo conceito
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-stone-400">Powered by GPT-4o + DALL-E 3 · Otelie Studio</p>
+        <p className="mt-6 text-center text-xs text-stone-400">Powered by GPT-4o · Otelie Studio</p>
       </div>
     </main>
   )
