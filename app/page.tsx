@@ -58,7 +58,12 @@ export default function HomePage() {
         return
       }
 
-      const encoded = encodeURIComponent(JSON.stringify({ result, form, photoBase64 }))
+      if (photoBase64) {
+        sessionStorage.setItem('otelie_photo', photoBase64)
+      } else {
+        sessionStorage.removeItem('otelie_photo')
+      }
+      const encoded = encodeURIComponent(JSON.stringify({ result, form }))
       router.push(`/resultado?data=${encoded}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido.')

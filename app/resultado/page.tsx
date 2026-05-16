@@ -16,7 +16,9 @@ function ResultContent() {
   const parsed = raw ? JSON.parse(decodeURIComponent(raw)) : null
   const result: BriefResult = parsed?.result
   const form: BriefFormData = parsed?.form
-  const photoBase64: string | undefined = parsed?.photoBase64
+  const photoBase64: string | undefined = typeof window !== 'undefined'
+    ? sessionStorage.getItem('otelie_photo') ?? undefined
+    : undefined
   const spaceAnalysis: string | undefined = result?.spaceAnalysis
 
   useEffect(() => {
