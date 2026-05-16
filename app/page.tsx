@@ -7,6 +7,7 @@ import type { BriefFormData, SpaceType, Budget, Location } from '@/lib/types'
 export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<BriefFormData>({
     tipo: 'cafe',
     area: 40,
@@ -19,16 +20,29 @@ export default function HomePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setError(null)
 
-    const res = await fetch('/api/gerar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
+    try {
+      const res = await fetch('/api/gerar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
 
-    const result = await res.json()
-    const encoded = encodeURIComponent(JSON.stringify({ result, form }))
-    router.push(`/resultado?data=${encoded}`)
+      const result = await res.json()
+
+      if (!res.ok) {
+        setError(result.error ?? 'Erro ao gerar conceito.')
+        setLoading(false)
+        return
+      }
+
+      const encoded = encodeURIComponent(JSON.stringify({ result, form }))
+      router.push(`/resultado?data=${encoded}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -163,6 +177,10 @@ export default function HomePage() {
               className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </div>
+
+          {error && (
+            <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>
+          )}
 
           <button
             type="submit"

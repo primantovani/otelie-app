@@ -1,5 +1,5 @@
 import { generateObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { buildPrompt } from '@/lib/prompts'
 import type { BriefFormData } from '@/lib/types'
@@ -14,13 +14,19 @@ const BriefSchema = z.object({
 })
 
 export async function POST(req: Request) {
-  const data: BriefFormData = await req.json()
+  try {
+    const data: BriefFormData = await req.json()
 
-  const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-6'),
-    schema: BriefSchema,
-    prompt: buildPrompt(data),
-  })
+    const { object } = await generateObject({
+      model: openai('gpt-4o'),
+      schema: BriefSchema,
+      prompt: buildPrompt(data),
+    })
 
-  return Response.json(object)
+    return Response.json(object)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('Erro /api/gerar:', message)
+    return Response.json({ error: message }, { status: 500 })
+  }
 }

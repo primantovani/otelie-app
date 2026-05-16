@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import type { BriefResult, BriefFormData } from '@/lib/types'
 import { SPACE_LABELS } from '@/lib/types'
 
@@ -9,16 +9,39 @@ function ResultContent() {
   const params = useSearchParams()
   const router = useRouter()
   const raw = params.get('data')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imageLoading, setImageLoading] = useState(true)
+  const [imageError, setImageError] = useState<string | null>(null)
 
-  if (!raw) {
+  const parsed = raw ? JSON.parse(decodeURIComponent(raw)) : null
+  const result: BriefResult = parsed?.result
+  const form: BriefFormData = parsed?.form
+
+  useEffect(() => {
+    if (!result || !form) return
+
+    fetch('/api/imagem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ result, form }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.url) setImageUrl(data.url)
+        else setImageError(data.error ?? 'Sem URL na resposta')
+      })
+      .catch(e => setImageError(e.message))
+      .finally(() => setImageLoading(false))
+  }, [])
+
+  if (!result || !form) {
     router.push('/')
     return null
   }
 
-  const { result, form }: { result: BriefResult; form: BriefFormData } = JSON.parse(decodeURIComponent(raw))
-
   function handleDownload() {
-    window.open(`/api/pdf?data=${params.get('data')}`, '_blank')
+    const encoded = encodeURIComponent(params.get('data') ?? '')
+    window.open(`/api/pdf?data=${encoded}`, '_blank')
   }
 
   return (
@@ -38,6 +61,21 @@ function ResultContent() {
           >
             ← Novo conceito
           </button>
+        </div>
+
+        {/* Image */}
+        <div className="rounded-2xl overflow-hidden mb-6 bg-stone-100 aspect-video flex items-center justify-center">
+          {imageLoading ? (
+            <div className="flex flex-col items-center gap-2 text-stone-400">
+              <div className="w-6 h-6 border-2 border-stone-300 border-t-indigo-400 rounded-full animate-spin" />
+              <p className="text-xs">Gerando imagem do ambiente…</p>
+            </div>
+          ) : imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="Render do ambiente" className="w-full h-full object-cover" />
+          ) : (
+            <p className="text-xs text-red-400 px-4 text-center">{imageError ?? 'Imagem não disponível'}</p>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
@@ -103,7 +141,7 @@ function ResultContent() {
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-stone-400">Powered by Claude · Otelie Studio</p>
+        <p className="mt-6 text-center text-xs text-stone-400">Powered by GPT-4o + DALL-E 3 · Otelie Studio</p>
       </div>
     </main>
   )
