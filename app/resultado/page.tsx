@@ -39,9 +39,26 @@ function ResultContent() {
     return null
   }
 
-  function handleDownload() {
-    const encoded = encodeURIComponent(params.get('data') ?? '')
-    window.open(`/api/pdf?data=${encoded}`, '_blank')
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  async function handleDownload() {
+    setPdfLoading(true)
+    try {
+      const res = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result, form, imageBase64: imageUrl }),
+      })
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'conceito-otelie.pdf'
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setPdfLoading(false)
+    }
   }
 
   return (
@@ -131,7 +148,7 @@ function ResultContent() {
             onClick={handleDownload}
             className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors"
           >
-            Baixar PDF
+            {pdfLoading ? 'Gerando PDF…' : 'Baixar PDF'}
           </button>
           <button
             onClick={() => router.push('/')}

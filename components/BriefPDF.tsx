@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 import type { BriefResult } from '@/lib/types'
 
 const s = StyleSheet.create({
@@ -23,9 +23,10 @@ interface Props {
   result: BriefResult
   spaceLabel: string
   area: number
+  imageBase64?: string
 }
 
-export function BriefPDF({ result, spaceLabel, area }: Props) {
+export function BriefPDF({ result, spaceLabel, area, imageBase64 }: Props) {
   return (
     <Document>
       <Page size="A4" style={s.page}>
@@ -34,6 +35,13 @@ export function BriefPDF({ result, spaceLabel, area }: Props) {
           <Text style={s.title}>Conceito de Design</Text>
           <Text style={s.subtitle}>{spaceLabel} · {area}m²</Text>
         </View>
+
+        {imageBase64 && (
+          <Image
+            src={imageBase64}
+            style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 20 }}
+          />
+        )}
 
         <View style={s.divider} />
 
