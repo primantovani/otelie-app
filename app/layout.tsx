@@ -1,8 +1,18 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
+import { DM_Sans, DM_Mono } from 'next/font/google'
 import './globals.css'
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  variable: '--font-sans',
+})
+
+const dmMono = DM_Mono({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  variable: '--font-mono',
+})
 
 export const metadata: Metadata = {
   title: 'Otelie Studio — Conceito de Design para Pequenos Negócios',
@@ -11,8 +21,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${geist.variable} h-full`}>
-      <body className="min-h-full antialiased" style={{ background: '#f8f6f3', color: '#1a1714' }}>{children}</body>
+    <html lang="pt-BR" className={`${dmSans.variable} ${dmMono.variable} h-full`}>
+      <body className="min-h-full h-full antialiased">{children}</body>
     </html>
   )
 }

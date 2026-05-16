@@ -71,21 +71,21 @@ function ResultContent() {
   ]
 
   return (
-    <main className="min-h-screen px-4 py-16" style={{ background: '#f8f6f3' }}>
+    <main className="min-h-screen px-4 py-16" style={{ background: '#f8f9fb' }}>
       <div className="max-w-xl mx-auto">
 
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-[#9c9289] uppercase mb-1">Otelie Studio</p>
-            <h1 className="text-2xl font-bold text-[#1a1714]">Conceito de Design</h1>
-            <p className="text-sm text-[#9c9289] mt-0.5">
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-[#9ca3af] uppercase mb-1">Otelie Studio</p>
+            <h1 className="text-2xl font-bold text-[#1f2937]">Conceito de Design</h1>
+            <p className="text-sm text-[#9ca3af] mt-0.5">
               {SPACE_LABELS[form.tipo]} · {form.area} m²
             </p>
           </div>
           <button
             onClick={() => router.push('/')}
-            className="text-xs text-[#9c9289] hover:text-[#1a1714] transition-colors mt-1"
+            className="text-xs text-[#9ca3af] hover:text-[#1f2937] transition-colors mt-1"
           >
             ← Novo conceito
           </button>
@@ -95,22 +95,22 @@ function ResultContent() {
         {photoBase64 ? (
           <div className="mb-6 space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <div className="relative rounded-xl overflow-hidden bg-[#ede9e3] aspect-video">
+              <div className="relative rounded-xl overflow-hidden bg-[#f3f4f6] aspect-video">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoBase64} alt="Antes" className="w-full h-full object-cover" />
                 <span className="absolute bottom-2 left-2 bg-black/40 text-white text-[10px] font-medium px-2 py-0.5 rounded-full tracking-wide">Antes</span>
               </div>
-              <div className="relative rounded-xl overflow-hidden bg-[#ede9e3] aspect-video flex items-center justify-center">
+              <div className="relative rounded-xl overflow-hidden bg-[#f3f4f6] aspect-video flex items-center justify-center">
                 {imageLoading ? (
-                  <div className="flex flex-col items-center gap-2 text-[#9c9289]">
-                    <div className="w-4 h-4 border border-[#c4bdb3] border-t-[#1a1714] rounded-full animate-spin" />
+                  <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
+                    <div className="w-4 h-4 border border-[#d1d5db] border-t-[#6366f1] rounded-full animate-spin" />
                     <p className="text-[10px]">Gerando…</p>
                   </div>
                 ) : imageUrl ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={imageUrl} alt="Proposta" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-2 left-2 bg-[#1a1714]/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-full tracking-wide">Proposta</span>
+                    <span className="absolute bottom-2 left-2 bg-[#6366f1]/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-full tracking-wide">Proposta</span>
                   </>
                 ) : (
                   <p className="text-[10px] text-red-400 px-2 text-center">{imageError}</p>
@@ -118,17 +118,17 @@ function ResultContent() {
               </div>
             </div>
             {spaceAnalysis && (
-              <details className="text-xs text-[#9c9289] cursor-pointer group">
-                <summary className="hover:text-[#1a1714] transition-colors select-none">Ver análise do espaço real</summary>
-                <p className="mt-2 leading-relaxed bg-white rounded-xl p-4 border border-[#ede9e3]">{spaceAnalysis}</p>
+              <details className="text-xs text-[#9ca3af] cursor-pointer group">
+                <summary className="hover:text-[#1f2937] transition-colors select-none">Ver análise do espaço real</summary>
+                <p className="mt-2 leading-relaxed bg-white rounded-xl p-4 border border-[#e5e7eb]">{spaceAnalysis}</p>
               </details>
             )}
           </div>
         ) : (
-          <div className="rounded-xl overflow-hidden mb-6 bg-[#ede9e3] aspect-video flex items-center justify-center">
+          <div className="rounded-xl overflow-hidden mb-6 bg-[#f3f4f6] aspect-video flex items-center justify-center">
             {imageLoading ? (
-              <div className="flex flex-col items-center gap-2 text-[#9c9289]">
-                <div className="w-5 h-5 border border-[#c4bdb3] border-t-[#1a1714] rounded-full animate-spin" />
+              <div className="flex flex-col items-center gap-2 text-[#9ca3af]">
+                <div className="w-5 h-5 border border-[#d1d5db] border-t-[#6366f1] rounded-full animate-spin" />
                 <p className="text-xs">Gerando imagem…</p>
               </div>
             ) : imageUrl ? (
@@ -141,16 +141,16 @@ function ResultContent() {
         )}
 
         {/* Concept card */}
-        <div className="bg-white rounded-2xl border border-[#ede9e3] overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden">
 
           {/* Vibe + Palette */}
-          <div className="px-8 pt-8 pb-6 border-b border-[#ede9e3]">
+          <div className="px-8 pt-8 pb-6 border-b border-[#e5e7eb]">
             <div className="flex items-start justify-between gap-6">
               <div>
                 <p className="form-label mb-3">Atmosfera</p>
                 <div className="flex flex-wrap gap-1.5">
                   {result.vibe.map(v => (
-                    <span key={v} className="px-3 py-1 rounded-full border border-[#e5e0d8] text-[#5c5449] text-xs font-medium">
+                    <span key={v} className="px-3 py-1 rounded-full border border-[#e5e7eb] text-[#6b7280] text-xs font-medium">
                       {v}
                     </span>
                   ))}
@@ -162,7 +162,7 @@ function ResultContent() {
                   {result.palette.map(color => (
                     <div key={color} title={color} className="flex flex-col items-center gap-1">
                       <div
-                        className="w-7 h-7 rounded-full border border-[#ede9e3] shadow-sm"
+                        className="w-7 h-7 rounded-full border border-[#e5e7eb] shadow-sm"
                         style={{ backgroundColor: color }}
                       />
                     </div>
@@ -173,11 +173,11 @@ function ResultContent() {
           </div>
 
           {/* Sections */}
-          <div className="divide-y divide-[#ede9e3]">
+          <div className="divide-y divide-[#e5e7eb]">
             {sections.map(({ label, text }) => (
               <div key={label} className="px-8 py-5">
                 <p className="form-label mb-1.5">{label}</p>
-                <p className="text-sm text-[#3d3830] leading-relaxed">{text}</p>
+                <p className="text-sm text-[#4b5563] leading-relaxed">{text}</p>
               </div>
             ))}
           </div>
@@ -188,19 +188,19 @@ function ResultContent() {
           <button
             onClick={handleDownload}
             disabled={imageLoading || pdfLoading}
-            className="flex-1 py-3 rounded-xl bg-[#1a1714] text-white font-semibold text-sm hover:bg-[#2d2a26] transition-colors disabled:opacity-40"
+            className="flex-1 py-3 rounded-xl bg-[#6366f1] text-white font-semibold text-sm hover:bg-[#4f46e5] transition-colors disabled:opacity-40"
           >
             {pdfLoading ? 'Gerando PDF…' : 'Baixar PDF'}
           </button>
           <button
             onClick={() => router.push('/')}
-            className="flex-1 py-3 rounded-xl border border-[#e5e0d8] text-[#5c5449] font-semibold text-sm hover:bg-[#faf9f7] hover:border-[#c4bdb3] transition-colors"
+            className="flex-1 py-3 rounded-xl border border-[#e5e7eb] text-[#6b7280] font-semibold text-sm hover:bg-[#f8f9fb] hover:border-[#d1d5db] transition-colors"
           >
             Novo conceito
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-[#c4bdb3]">Otelie Studio · Powered by GPT-4o</p>
+        <p className="mt-6 text-center text-xs text-[#9ca3af]">Otelie Studio · Powered by GPT-4o</p>
       </div>
     </main>
   )

@@ -33,7 +33,7 @@ function OptGrid<T extends string>({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-bold uppercase tracking-widest text-[#c4bdb3] mb-4 mt-1">
+    <p className="text-xs font-bold uppercase tracking-widest text-[#9ca3af] mb-4 mt-1">
       {children}
     </p>
   )
@@ -113,21 +113,21 @@ export default function HomePage() {
     }
   }
 
-  const inputCls = 'w-full rounded-xl border border-[#e5e0d8] bg-[#faf9f7] px-4 py-3.5 text-[0.9375rem] text-[#1a1714] placeholder-[#c4bdb3] focus:outline-none focus:ring-1 focus:ring-[#1a1714]'
+  const inputCls = 'w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3.5 text-[0.9375rem] text-[#1f2937] placeholder-[#c4bdb3] focus:outline-none focus:ring-1 focus:ring-[#6366f1]'
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-xl">
 
         <div className="mb-10 text-center">
-          <p className="text-[10px] font-bold tracking-[0.25em] text-[#c4bdb3] uppercase mb-5">Otelie Studio</p>
-          <h1 className="text-[2rem] font-bold text-[#1a1714] leading-tight">
+          <p className="text-[10px] font-bold tracking-[0.25em] text-[#9ca3af] uppercase mb-5">Otelie Studio</p>
+          <h1 className="text-[2rem] font-bold text-[#1f2937] leading-tight">
             Conceito de design<br />para o seu espaço
           </h1>
-          <p className="mt-4 text-[#9c9289] text-base">Responda as perguntas e receba um conceito completo em segundos.</p>
+          <p className="mt-4 text-[#9ca3af] text-base">Responda as perguntas e receba um conceito completo em segundos.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#ede9e3] overflow-hidden">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden">
 
           {/* Bloco 1 — O espaço */}
           <div className="px-8 pt-8 pb-7">
@@ -200,15 +200,15 @@ export default function HomePage() {
                     type="range" min={15} max={300} step={5}
                     value={form.area}
                     onChange={e => set('area', Number(e.target.value))}
-                    className="flex-1 accent-[#1a1714]"
+                    className="flex-1 accent-[#6366f1]"
                   />
-                  <span className="text-base font-semibold text-[#1a1714] w-16 text-right tabular-nums">{form.area} m²</span>
+                  <span className="text-base font-semibold text-[#1f2937] w-16 text-right tabular-nums">{form.area} m²</span>
                 </div>
               </div>
 
               <div>
                 <label className="form-label">
-                  Medidas exatas <span className="text-[#c4bdb3] font-normal normal-case tracking-normal">— opcional</span>
+                  Medidas exatas <span className="text-[#9ca3af] font-normal normal-case tracking-normal">— opcional</span>
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -217,7 +217,7 @@ export default function HomePage() {
                     { key: 'alturaPeDireito' as const, label: 'Pé-direito' },
                   ].map(({ key, label }) => (
                     <div key={key}>
-                      <p className="text-xs text-[#9c9289] mb-1.5">{label}</p>
+                      <p className="text-xs text-[#9ca3af] mb-1.5">{label}</p>
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
@@ -225,9 +225,9 @@ export default function HomePage() {
                           placeholder="—"
                           value={form[key] ?? ''}
                           onChange={e => set(key, e.target.value ? Number(e.target.value) : undefined)}
-                          className="w-full rounded-xl border border-[#e5e0d8] bg-[#faf9f7] px-3 py-3 text-[0.9375rem] text-[#1a1714] placeholder-[#c4bdb3] focus:outline-none focus:ring-1 focus:ring-[#1a1714]"
+                          className="w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-3 py-3 text-[0.9375rem] text-[#1f2937] placeholder-[#c4bdb3] focus:outline-none focus:ring-1 focus:ring-[#6366f1]"
                         />
-                        <span className="text-sm text-[#9c9289] shrink-0">m</span>
+                        <span className="text-sm text-[#9ca3af] shrink-0">m</span>
                       </div>
                     </div>
                   ))}
@@ -270,9 +270,9 @@ export default function HomePage() {
                     type="range" min={5} max={150} step={5}
                     value={form.capacidade}
                     onChange={e => set('capacidade', Number(e.target.value))}
-                    className="flex-1 accent-[#1a1714]"
+                    className="flex-1 accent-[#6366f1]"
                   />
-                  <span className="text-base font-semibold text-[#1a1714] w-24 text-right tabular-nums">{form.capacidade} lugares</span>
+                  <span className="text-base font-semibold text-[#1f2937] w-24 text-right tabular-nums">{form.capacidade} lugares</span>
                 </div>
               </div>
             </div>
@@ -350,16 +350,16 @@ export default function HomePage() {
 
               <div>
                 <label className="form-label">
-                  Foto do espaço atual <span className="text-[#c4bdb3] font-normal normal-case tracking-normal">— opcional</span>
+                  Foto do espaço atual <span className="text-[#9ca3af] font-normal normal-case tracking-normal">— opcional</span>
                 </label>
                 {photoPreview ? (
-                  <div className="relative rounded-xl overflow-hidden border border-[#e5e0d8]">
+                  <div className="relative rounded-xl overflow-hidden border border-[#e5e7eb]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={photoPreview} alt="Espaço atual" className="w-full h-44 object-cover" />
                     <button
                       type="button"
                       onClick={removePhoto}
-                      className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 text-sm text-[#5c5449] hover:text-[#1a1714] transition-colors border border-[#e5e0d8]"
+                      className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 text-sm text-[#6b7280] hover:text-[#1f2937] transition-colors border border-[#e5e7eb]"
                     >
                       Remover
                     </button>
@@ -368,7 +368,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-24 rounded-xl border border-dashed border-[#c4bdb3] bg-[#faf9f7] text-[#9c9289] text-sm hover:border-[#1a1714] hover:text-[#1a1714] transition-all flex items-center justify-center gap-2"
+                    className="w-full h-24 rounded-xl border border-dashed border-[#d1d5db] bg-[#f8f9fb] text-[#9ca3af] text-sm hover:border-[#1a1714] hover:text-[#1f2937] transition-all flex items-center justify-center gap-2"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -383,7 +383,7 @@ export default function HomePage() {
 
               <div>
                 <label className="form-label">
-                  Observações <span className="text-[#c4bdb3] font-normal normal-case tracking-normal">— opcional</span>
+                  Observações <span className="text-[#9ca3af] font-normal normal-case tracking-normal">— opcional</span>
                 </label>
                 <textarea
                   rows={3}
@@ -404,14 +404,14 @@ export default function HomePage() {
             <button
               type="submit"
               disabled={loading || !form.vibe.trim()}
-              className="w-full py-4 rounded-xl bg-[#1a1714] text-white font-semibold text-base hover:bg-[#2d2a26] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-4 rounded-xl bg-[#6366f1] text-white font-semibold text-base hover:bg-[#4f46e5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? 'Gerando conceito…' : 'Gerar conceito de design'}
             </button>
           </div>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[#c4bdb3]">Otelie Studio · Powered by GPT-4o</p>
+        <p className="mt-6 text-center text-sm text-[#9ca3af]">Otelie Studio · Powered by GPT-4o</p>
       </div>
     </main>
   )
