@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { BriefFormData, SpaceType, Budget, Location, EstadoAtual, LuzNatural, PeDireito, PublicoAlvo, Prioridade } from '@/lib/types'
 
-function OptionGrid<T extends string>({
+function OptGrid<T extends string>({
   options,
   value,
   onChange,
@@ -16,17 +16,13 @@ function OptionGrid<T extends string>({
   cols?: number
 }) {
   return (
-    <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {options.map(([val, label]) => (
         <button
           key={val}
           type="button"
           onClick={() => onChange(val)}
-          className={`py-2 px-3 rounded-xl text-sm font-medium border transition-all text-left ${
-            value === val
-              ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-              : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-stone-300'
-          }`}
+          className={`opt-btn${value === val ? ' selected' : ''}`}
         >
           {label}
         </button>
@@ -87,28 +83,20 @@ export default function HomePage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-
     try {
       const res = await fetch('/api/gerar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, photoBase64 }),
       })
-
       const result = await res.json()
-
       if (!res.ok) {
         setError(result.error ?? 'Erro ao gerar conceito.')
         setLoading(false)
         return
       }
-
-      if (photoBase64) {
-        sessionStorage.setItem('otelie_photo', photoBase64)
-      } else {
-        sessionStorage.removeItem('otelie_photo')
-      }
-
+      if (photoBase64) sessionStorage.setItem('otelie_photo', photoBase64)
+      else sessionStorage.removeItem('otelie_photo')
       const encoded = encodeURIComponent(JSON.stringify({ result, form }))
       router.push(`/resultado?data=${encoded}`)
     } catch (err) {
@@ -117,39 +105,38 @@ export default function HomePage() {
     }
   }
 
+  const inputCls = 'w-full rounded-xl border border-[#e5e0d8] bg-[#faf9f7] px-4 py-3 text-sm text-[#1a1714] placeholder-[#c4bdb3] focus:outline-none focus:ring-1 focus:ring-[#1a1714]'
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-xl">
+
         <div className="mb-10 text-center">
-          <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Otelie Studio</p>
-          <h1 className="text-3xl font-bold text-stone-900 leading-snug">
+          <p className="text-[10px] font-semibold tracking-[0.2em] text-[#9c9289] uppercase mb-4">Otelie Studio</p>
+          <h1 className="text-[2rem] font-bold text-[#1a1714] leading-tight">
             Conceito de design<br />para o seu espaço
           </h1>
-          <p className="mt-3 text-stone-500 text-sm">Responda as perguntas e receba um conceito completo em segundos.</p>
+          <p className="mt-3 text-[#9c9289] text-sm">Responda as perguntas e receba um conceito completo em segundos.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-stone-100 p-8 space-y-7">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#ede9e3] p-8 space-y-7">
 
           {/* Tipo */}
           <div>
             <label className="form-label">Tipo de espaço</label>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            <div className="grid grid-cols-5 gap-2">
               {([
-                ['cafe', '☕ Café'],
-                ['loja', '🛍 Loja'],
-                ['bar', '🍻 Bar'],
-                ['restaurante', '🍽 Restaurante'],
-                ['studio', '🎨 Studio'],
+                ['cafe', 'Café'],
+                ['loja', 'Loja'],
+                ['bar', 'Bar'],
+                ['restaurante', 'Restaurante'],
+                ['studio', 'Studio'],
               ] as [SpaceType, string][]).map(([val, label]) => (
                 <button
                   key={val}
                   type="button"
                   onClick={() => set('tipo', val)}
-                  className={`py-2 px-1 rounded-xl text-sm font-medium border transition-all text-center ${
-                    form.tipo === val
-                      ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-stone-300'
-                  }`}
+                  className={`opt-btn text-center${form.tipo === val ? ' selected' : ''}`}
                 >
                   {label}
                 </button>
@@ -160,14 +147,14 @@ export default function HomePage() {
           {/* Área */}
           <div>
             <label className="form-label">Área aproximada</label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <input
                 type="range" min={15} max={300} step={5}
                 value={form.area}
                 onChange={e => set('area', Number(e.target.value))}
-                className="flex-1 accent-indigo-500"
+                className="flex-1 accent-[#1a1714]"
               />
-              <span className="text-sm font-semibold text-stone-700 w-16 text-right">{form.area} m²</span>
+              <span className="text-sm font-semibold text-[#1a1714] w-16 text-right tabular-nums">{form.area} m²</span>
             </div>
           </div>
 
@@ -175,76 +162,44 @@ export default function HomePage() {
           <div>
             <label className="form-label">
               Medidas do ambiente{' '}
-              <span className="text-stone-300 font-normal normal-case">(opcional — melhora a precisão do layout)</span>
+              <span className="text-[#c4bdb3] font-normal normal-case tracking-normal">— opcional</span>
             </label>
             <div className="grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-xs text-stone-400 mb-1">Comprimento</p>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={1} max={200} step={0.5}
-                    placeholder="—"
-                    value={form.comprimento ?? ''}
-                    onChange={e => set('comprimento', e.target.value ? Number(e.target.value) : undefined)}
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                  <span className="text-xs text-stone-400 shrink-0">m</span>
+              {[
+                { key: 'comprimento' as const, label: 'Comprimento' },
+                { key: 'largura' as const, label: 'Largura' },
+                { key: 'alturaPeDireito' as const, label: 'Pé-direito' },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <p className="text-[11px] text-[#9c9289] mb-1.5">{label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1} max={200} step={0.5}
+                      placeholder="—"
+                      value={form[key] ?? ''}
+                      onChange={e => set(key, e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full rounded-xl border border-[#e5e0d8] bg-[#faf9f7] px-3 py-2.5 text-sm text-[#1a1714] placeholder-[#c4bdb3] focus:outline-none focus:ring-1 focus:ring-[#1a1714]"
+                    />
+                    <span className="text-xs text-[#9c9289] shrink-0">m</span>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <p className="text-xs text-stone-400 mb-1">Largura</p>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={1} max={200} step={0.5}
-                    placeholder="—"
-                    value={form.largura ?? ''}
-                    onChange={e => set('largura', e.target.value ? Number(e.target.value) : undefined)}
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                  <span className="text-xs text-stone-400 shrink-0">m</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-stone-400 mb-1">Pé-direito</p>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={1.8} max={15} step={0.1}
-                    placeholder="—"
-                    value={form.alturaPeDireito ?? ''}
-                    onChange={e => set('alturaPeDireito', e.target.value ? Number(e.target.value) : undefined)}
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                  <span className="text-xs text-stone-400 shrink-0">m</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Pé-direito + Luz natural */}
+          {/* Pé-direito + Luz */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Pé-direito</label>
               <div className="flex flex-col gap-2">
                 {([
-                  ['baixo', 'Baixo — até 2,5m'],
-                  ['medio', 'Médio — 2,5–3,5m'],
-                  ['alto', 'Alto — +3,5m'],
+                  ['baixo', 'Até 2,5 m'],
+                  ['medio', '2,5 a 3,5 m'],
+                  ['alto', 'Acima de 3,5 m'],
                 ] as [PeDireito, string][]).map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => set('peDireito', val)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium border transition-all text-left ${
-                      form.peDireito === val
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-stone-300'
-                    }`}
-                  >
-                    {label}
-                  </button>
+                  <button key={val} type="button" onClick={() => set('peDireito', val)}
+                    className={`opt-btn${form.peDireito === val ? ' selected' : ''}`}>{label}</button>
                 ))}
               </div>
             </div>
@@ -252,22 +207,12 @@ export default function HomePage() {
               <label className="form-label">Luz natural</label>
               <div className="flex flex-col gap-2">
                 {([
-                  ['muita', '☀️ Muita'],
-                  ['moderada', '🌤 Moderada'],
-                  ['pouca', '🌑 Pouca'],
+                  ['muita', 'Muita'],
+                  ['moderada', 'Moderada'],
+                  ['pouca', 'Pouca ou nenhuma'],
                 ] as [LuzNatural, string][]).map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => set('luzNatural', val)}
-                    className={`py-2 px-3 rounded-xl text-sm font-medium border transition-all text-left ${
-                      form.luzNatural === val
-                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
-                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-stone-300'
-                    }`}
-                  >
-                    {label}
-                  </button>
+                  <button key={val} type="button" onClick={() => set('luzNatural', val)}
+                    className={`opt-btn${form.luzNatural === val ? ' selected' : ''}`}>{label}</button>
                 ))}
               </div>
             </div>
@@ -276,11 +221,11 @@ export default function HomePage() {
           {/* Estado atual */}
           <div>
             <label className="form-label">Estado atual do espaço</label>
-            <OptionGrid
+            <OptGrid
               options={[
-                ['obra-bruta', '🧱 Obra bruta'],
-                ['ja-funciona', '🏃 Já funciona'],
-                ['precisa-refresh', '✨ Precisa de refresh'],
+                ['obra-bruta', 'Obra bruta'],
+                ['ja-funciona', 'Já em funcionamento'],
+                ['precisa-refresh', 'Precisa de atualização'],
               ] as [EstadoAtual, string][]}
               value={form.estadoAtual}
               onChange={v => set('estadoAtual', v)}
@@ -291,21 +236,21 @@ export default function HomePage() {
           {/* Capacidade */}
           <div>
             <label className="form-label">Capacidade desejada</label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <input
                 type="range" min={5} max={150} step={5}
                 value={form.capacidade}
                 onChange={e => set('capacidade', Number(e.target.value))}
-                className="flex-1 accent-indigo-500"
+                className="flex-1 accent-[#1a1714]"
               />
-              <span className="text-sm font-semibold text-stone-700 w-24 text-right">{form.capacidade} lugares</span>
+              <span className="text-sm font-semibold text-[#1a1714] w-24 text-right tabular-nums">{form.capacidade} lugares</span>
             </div>
           </div>
 
           {/* Orçamento */}
           <div>
             <label className="form-label">Orçamento para reforma</label>
-            <OptionGrid
+            <OptGrid
               options={[
                 ['ate50k', 'Até R$ 50k'],
                 ['50k-150k', 'R$ 50k – 150k'],
@@ -320,11 +265,11 @@ export default function HomePage() {
           {/* Prioridade */}
           <div>
             <label className="form-label">Prioridade da reforma</label>
-            <OptionGrid
+            <OptGrid
               options={[
-                ['completa', '🔨 Reforma completa'],
-                ['moveis-decor', '🛋 Móveis e decor'],
-                ['iluminacao', '💡 Foco em iluminação'],
+                ['completa', 'Reforma completa'],
+                ['moveis-decor', 'Móveis e decor'],
+                ['iluminacao', 'Foco em iluminação'],
               ] as [Prioridade, string][]}
               value={form.prioridade}
               onChange={v => set('prioridade', v)}
@@ -341,19 +286,19 @@ export default function HomePage() {
               placeholder="ex: aconchegante, industrial, minimalista japonês…"
               value={form.vibe}
               onChange={e => set('vibe', e.target.value)}
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className={inputCls}
             />
           </div>
 
           {/* Público-alvo */}
           <div>
             <label className="form-label">Público-alvo</label>
-            <OptionGrid
+            <OptGrid
               options={[
-                ['jovem-casual', '😎 Jovem / casual'],
-                ['corporativo', '💼 Corporativo'],
-                ['familia', '👨‍👩‍👧 Família'],
-                ['turista', '🌍 Turista'],
+                ['jovem-casual', 'Jovem / casual'],
+                ['corporativo', 'Corporativo'],
+                ['familia', 'Família'],
+                ['turista', 'Turista'],
               ] as [PublicoAlvo, string][]}
               value={form.publicoAlvo}
               onChange={v => set('publicoAlvo', v)}
@@ -363,12 +308,12 @@ export default function HomePage() {
           {/* Localização */}
           <div>
             <label className="form-label">Localização</label>
-            <OptionGrid
+            <OptGrid
               options={[
-                ['terreo-urbano', '🏙 Térreo urbano'],
-                ['shopping', '🏬 Shopping'],
-                ['rua-bairro', '🌿 Rua de bairro'],
-                ['outro', '📍 Outro'],
+                ['terreo-urbano', 'Térreo urbano'],
+                ['shopping', 'Shopping'],
+                ['rua-bairro', 'Rua de bairro'],
+                ['outro', 'Outro'],
               ] as [Location, string][]}
               value={form.localizacao}
               onChange={v => set('localizacao', v)}
@@ -379,28 +324,32 @@ export default function HomePage() {
           <div>
             <label className="form-label">
               Foto do espaço atual{' '}
-              <span className="text-stone-300 font-normal normal-case">(opcional — a IA analisa a estrutura real)</span>
+              <span className="text-[#c4bdb3] font-normal normal-case tracking-normal">— opcional</span>
             </label>
             {photoPreview ? (
-              <div className="relative rounded-xl overflow-hidden border border-stone-200">
+              <div className="relative rounded-xl overflow-hidden border border-[#e5e0d8]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoPreview} alt="Espaço atual" className="w-full h-40 object-cover" />
                 <button
                   type="button"
                   onClick={removePhoto}
-                  className="absolute top-2 right-2 bg-white/90 rounded-full px-2 py-0.5 text-xs text-stone-500 hover:text-red-500 transition-colors"
+                  className="absolute top-2 right-2 bg-white/90 rounded-full px-3 py-1 text-xs text-[#5c5449] hover:text-[#1a1714] transition-colors border border-[#e5e0d8]"
                 >
-                  remover
+                  Remover
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-24 rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 text-stone-400 text-sm hover:border-indigo-300 hover:text-indigo-400 transition-all flex flex-col items-center justify-center gap-1"
+                className="w-full h-20 rounded-xl border border-dashed border-[#c4bdb3] bg-[#faf9f7] text-[#9c9289] text-sm hover:border-[#1a1714] hover:text-[#1a1714] transition-all flex items-center justify-center gap-2"
               >
-                <span className="text-xl">📷</span>
-                <span>Adicionar foto do espaço</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Adicionar foto do espaço
               </button>
             )}
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
@@ -409,14 +358,15 @@ export default function HomePage() {
           {/* Observações */}
           <div>
             <label className="form-label">
-              Observações <span className="text-stone-300 font-normal normal-case">(opcional)</span>
+              Observações{' '}
+              <span className="text-[#c4bdb3] font-normal normal-case tracking-normal">— opcional</span>
             </label>
             <textarea
               rows={2}
               placeholder="Algo importante sobre o espaço, marca ou público…"
               value={form.observacoes}
               onChange={e => set('observacoes', e.target.value)}
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+              className={`${inputCls} resize-none`}
             />
           </div>
 
@@ -427,13 +377,13 @@ export default function HomePage() {
           <button
             type="submit"
             disabled={loading || !form.vibe.trim()}
-            className="w-full py-3.5 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3.5 rounded-xl bg-[#1a1714] text-white font-semibold text-sm hover:bg-[#2d2a26] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loading ? 'Gerando conceito…' : 'Gerar conceito de design →'}
+            {loading ? 'Gerando conceito…' : 'Gerar conceito de design'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-stone-400">Powered by GPT-4o · Otelie Studio</p>
+        <p className="mt-6 text-center text-xs text-[#c4bdb3]">Otelie Studio · Powered by GPT-4o</p>
       </div>
     </main>
   )
