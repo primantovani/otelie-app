@@ -19,6 +19,9 @@ export interface BriefFormData {
   publicoAlvo: PublicoAlvo
   prioridade: Prioridade
   capacidade: number
+  comprimento?: number
+  largura?: number
+  alturaPeDireito?: number
   observacoes?: string
 }
 

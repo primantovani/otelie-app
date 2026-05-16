@@ -55,6 +55,9 @@ export default function HomePage() {
     publicoAlvo: 'jovem-casual',
     prioridade: 'completa',
     capacidade: 20,
+    comprimento: undefined,
+    largura: undefined,
+    alturaPeDireito: undefined,
     observacoes: '',
   })
 
@@ -165,6 +168,58 @@ export default function HomePage() {
                 className="flex-1 accent-indigo-500"
               />
               <span className="text-sm font-semibold text-stone-700 w-16 text-right">{form.area} m²</span>
+            </div>
+          </div>
+
+          {/* Medidas exatas */}
+          <div>
+            <label className="form-label">
+              Medidas do ambiente{' '}
+              <span className="text-stone-300 font-normal normal-case">(opcional — melhora a precisão do layout)</span>
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-stone-400 mb-1">Comprimento</p>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={1} max={200} step={0.5}
+                    placeholder="—"
+                    value={form.comprimento ?? ''}
+                    onChange={e => set('comprimento', e.target.value ? Number(e.target.value) : undefined)}
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  <span className="text-xs text-stone-400 shrink-0">m</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 mb-1">Largura</p>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={1} max={200} step={0.5}
+                    placeholder="—"
+                    value={form.largura ?? ''}
+                    onChange={e => set('largura', e.target.value ? Number(e.target.value) : undefined)}
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  <span className="text-xs text-stone-400 shrink-0">m</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 mb-1">Pé-direito</p>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={1.8} max={15} step={0.1}
+                    placeholder="—"
+                    value={form.alturaPeDireito ?? ''}
+                    onChange={e => set('alturaPeDireito', e.target.value ? Number(e.target.value) : undefined)}
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  <span className="text-xs text-stone-400 shrink-0">m</span>
+                </div>
+              </div>
             </div>
           </div>
 

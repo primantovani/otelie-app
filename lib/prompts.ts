@@ -10,8 +10,8 @@ Gere um conceito de design acolhedor e com identidade própria para o seguinte e
 
 INFORMAÇÕES DO ESPAÇO:
 - Tipo: ${SPACE_LABELS[data.tipo]}
-- Área: ${data.area}m²
-- Pé-direito: ${PE_LABELS[data.peDireito]}
+- Área: ${data.area}m²${data.comprimento && data.largura ? ` (${data.comprimento}m × ${data.largura}m)` : ''}
+- Pé-direito: ${PE_LABELS[data.peDireito]}${data.alturaPeDireito ? ` — ${data.alturaPeDireito}m` : ''}
 - Luz natural: ${LUZ_LABELS[data.luzNatural]}
 - Estado atual: ${ESTADO_LABELS[data.estadoAtual]}
 - Capacidade desejada: ${data.capacidade} lugares
@@ -36,6 +36,7 @@ IMPORTANTE:
 - Vibe: 3-4 palavras que descrevem a atmosfera
 - Leve em conta o pé-direito e a luz natural nas recomendações de iluminação e layout
 - Considere a capacidade desejada de ${data.capacidade} lugares no layout
+${data.comprimento && data.largura ? `- Use as medidas exatas ${data.comprimento}m × ${data.largura}m para calcular a distribuição de mesas e circulação` : ''}${data.alturaPeDireito ? `- O pé-direito de ${data.alturaPeDireito}m deve influenciar as recomendações de iluminação e sensação de amplitude` : ''}
 ${spaceAnalysis ? '- Leve em conta as características físicas reais do espaço na análise acima' : ''}
 `
 }
