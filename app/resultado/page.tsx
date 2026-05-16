@@ -16,6 +16,8 @@ function ResultContent() {
   const parsed = raw ? JSON.parse(decodeURIComponent(raw)) : null
   const result: BriefResult = parsed?.result
   const form: BriefFormData = parsed?.form
+  const photoBase64: string | undefined = parsed?.photoBase64
+  const spaceAnalysis: string | undefined = result?.spaceAnalysis
 
   useEffect(() => {
     if (!result || !form) return
@@ -23,7 +25,7 @@ function ResultContent() {
     fetch('/api/imagem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ result, form }),
+      body: JSON.stringify({ result, form, photoBase64, spaceAnalysis }),
     })
       .then(r => r.json())
       .then(data => {

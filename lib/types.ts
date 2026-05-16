@@ -18,6 +18,7 @@ export interface BriefResult {
   materials: string
   acoustics: string
   layout: string
+  spaceAnalysis?: string
 }
 
 export const SPACE_LABELS: Record<SpaceType, string> = {

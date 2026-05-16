@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { BriefFormData, SpaceType, Budget, Location } from '@/lib/types'
 
@@ -8,6 +8,9 @@ export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState<BriefFormData>({
     tipo: 'cafe',
     area: 40,
@@ -16,6 +19,24 @@ export default function HomePage() {
     localizacao: 'terreo-urbano',
     observacoes: '',
   })
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string
+      setPhotoBase64(base64)
+      setPhotoPreview(base64)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function removePhoto() {
+    setPhotoBase64(null)
+    setPhotoPreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +47,7 @@ export default function HomePage() {
       const res = await fetch('/api/gerar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, photoBase64 }),
       })
 
       const result = await res.json()
@@ -37,7 +58,7 @@ export default function HomePage() {
         return
       }
 
-      const encoded = encodeURIComponent(JSON.stringify({ result, form }))
+      const encoded = encodeURIComponent(JSON.stringify({ result, form, photoBase64 }))
       router.push(`/resultado?data=${encoded}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido.')
@@ -165,6 +186,45 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Photo upload */}
+          <div>
+            <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">
+              Foto do espaço atual{' '}
+              <span className="text-stone-300 font-normal normal-case">(opcional — a IA mantém a estrutura real)</span>
+            </label>
+
+            {photoPreview ? (
+              <div className="relative rounded-xl overflow-hidden border border-stone-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoPreview} alt="Espaço atual" className="w-full h-40 object-cover" />
+                <button
+                  type="button"
+                  onClick={removePhoto}
+                  className="absolute top-2 right-2 bg-white/90 rounded-full px-2 py-0.5 text-xs text-stone-500 hover:text-red-500 transition-colors"
+                >
+                  remover
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-24 rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 text-stone-400 text-sm hover:border-indigo-300 hover:text-indigo-400 transition-all flex flex-col items-center justify-center gap-1"
+              >
+                <span className="text-xl">📷</span>
+                <span>Adicionar foto do espaço</span>
+              </button>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">
               Observações <span className="text-stone-300 font-normal normal-case">(opcional)</span>
@@ -191,7 +251,7 @@ export default function HomePage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-stone-400">Powered by Claude · Otelie Studio</p>
+        <p className="mt-6 text-center text-xs text-stone-400">Powered by GPT-4o · Otelie Studio</p>
       </div>
     </main>
   )

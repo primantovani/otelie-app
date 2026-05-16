@@ -1,4 +1,4 @@
-import { generateObject } from 'ai'
+import { generateObject, generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { buildPrompt } from '@/lib/prompts'
@@ -15,15 +15,37 @@ const BriefSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const data: BriefFormData = await req.json()
+    const { photoBase64, ...formData }: BriefFormData & { photoBase64?: string } = await req.json()
+
+    let spaceAnalysis = ''
+
+    if (photoBase64) {
+      const { text } = await generateText({
+        model: openai('gpt-4o'),
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              image: photoBase64,
+            },
+            {
+              type: 'text',
+              text: 'Analise esta foto de um espaço comercial. Descreva em 3-4 frases: formato do ambiente (planta baixa aproximada), pé-direito, posição de janelas e portas, elementos fixos (colunas, pilares, escadas), e qualidade de luz natural. Seja objetivo e técnico.',
+            },
+          ],
+        }],
+      })
+      spaceAnalysis = text
+    }
 
     const { object } = await generateObject({
       model: openai('gpt-4o'),
       schema: BriefSchema,
-      prompt: buildPrompt(data),
+      prompt: buildPrompt(formData, spaceAnalysis),
     })
 
-    return Response.json(object)
+    return Response.json({ ...object, spaceAnalysis })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('Erro /api/gerar:', message)
