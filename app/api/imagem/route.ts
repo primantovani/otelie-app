@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       quality: 'high',
     })
 
-    const b64 = image.data[0]?.b64_json
+    const b64 = image.data?.[0]?.b64_json
     if (!b64) return Response.json({ error: 'Sem imagem na resposta' }, { status: 500 })
 
     return Response.json({ url: `data:image/png;base64,${b64}` })
