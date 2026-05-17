@@ -68,3 +68,34 @@ body {
   border-top: 1px solid var(--border);
   margin: 0;
 }
+
+@keyframes reveal-section {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.983);
+    filter: blur(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.reveal-section {
+  animation: reveal-section 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes image-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.image-fadein {
+  animation: image-fadein 0.5s ease both;
+}

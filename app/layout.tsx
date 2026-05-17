@@ -15,13 +15,13 @@ const dmMono = DM_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Otelie Studio — Conceito de Design para Pequenos Negócios',
-  description: 'Gere um conceito de design para seu café, loja ou restaurante em minutos.',
+  title: 'Otelie Studio — Design Concepts for Small Businesses',
+  description: 'Generate a complete design concept for your café, bistro or ice cream shop in minutes.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${dmSans.variable} ${dmMono.variable} h-full`}>
+    <html lang="en" className={`${dmSans.variable} ${dmMono.variable} h-full`}>
       <body className="min-h-full h-full antialiased">{children}</body>
     </html>
   )
