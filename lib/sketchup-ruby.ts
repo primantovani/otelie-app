@@ -108,10 +108,12 @@ begin
 rescue; end` : ''
 
   // Camera positions
-  const camEye    = `Geom::Point3d.new(${Math.round(w*1.3)}, ${Math.round(-l*0.4)}, ${Math.round(h*0.9)})`
-  const camTarget = `Geom::Point3d.new(${Math.round(w/2)}, ${Math.round(l/2)}, ${Math.round(h/3)})`
-  const topEye    = `Geom::Point3d.new(${Math.round(w/2)}, ${Math.round(l/2)}, ${Math.round(h*4)})`
-  const topTarget = `Geom::Point3d.new(${Math.round(w/2)}, ${Math.round(l/2)}, 0)`
+  // View 1: from entrance corner looking toward back-right
+  const camEye    = `Geom::Point3d.new(${Math.round(w*0.12)}, ${Math.round(l*0.10)}, ${Math.round(h*0.55)})`
+  const camTarget = `Geom::Point3d.new(${Math.round(w*0.65)}, ${Math.round(l*0.80)}, ${Math.round(h*0.35)})`
+  // View 2: from back corner looking toward entrance (shows windows/door)
+  const topEye    = `Geom::Point3d.new(${Math.round(w*0.85)}, ${Math.round(l*0.85)}, ${Math.round(h*0.55)})`
+  const topTarget = `Geom::Point3d.new(${Math.round(w*0.3)}, ${Math.round(l*0.15)}, ${Math.round(h*0.35)})`
 
   return `
 model = Sketchup.active_model
@@ -186,9 +188,9 @@ cam1 = Sketchup::Camera.new(${camEye}, ${camTarget}, Geom::Vector3d.new(0,0,1))
 view.camera = cam1
 view.write_image({ filename: '${paths.perspective}', width: 1920, height: 1080, antialias: true })
 
-cam2 = Sketchup::Camera.new(${topEye}, ${topTarget}, Geom::Vector3d.new(0,1,0))
+cam2 = Sketchup::Camera.new(${topEye}, ${topTarget}, Geom::Vector3d.new(0,0,1))
 view.camera = cam2
-view.write_image({ filename: '${paths.topDown}', width: 1024, height: 1024, antialias: true })
+view.write_image({ filename: '${paths.topDown}', width: 1920, height: 1080, antialias: true })
 
 view.camera = cam1
 "ok"

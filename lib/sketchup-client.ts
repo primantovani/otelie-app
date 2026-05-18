@@ -27,7 +27,8 @@ export async function evalRuby(code: string): Promise<string> {
         const res = JSON.parse(buffer)
         socket.destroy()
         if (res.error) reject(new Error(res.error.message ?? 'SketchUp error'))
-        else resolve(res.result?.result ?? '')
+        else if (res.result?.isError) reject(new Error(res.result.content?.[0]?.text ?? 'SketchUp error'))
+        else resolve(res.result?.content?.[0]?.text ?? res.result?.result ?? '')
       } catch {
         // incomplete JSON — keep reading
       }
