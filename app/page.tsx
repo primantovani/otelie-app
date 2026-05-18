@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import type { SpaceViewer3DHandle } from '@/components/SpaceViewer3D'
 import type {
   BriefFormData, SpaceType, Budget, Location, EstadoAtual, LuzNatural, PeDireito, PublicoAlvo, Prioridade,
   CafeModelo, CafeDestaque, CafeAreaExterna,
@@ -11,8 +10,6 @@ import type {
   PlantaForma, JanelasPos, Fachada, ElementoFixo, EntradaPos,
   PisoTipo, ParedeTipo, TetoTipo,
 } from '@/lib/types'
-
-const SpaceViewer3D = lazy(() => import('@/components/SpaceViewer3D'))
 
 type FormState = {
   tipo: SpaceType | ''
@@ -120,7 +117,11 @@ export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const viewerRef = useRef<SpaceViewer3DHandle>(null)
+
+  const [modelLoading, setModelLoading] = useState(false)
+  const [modelError, setModelError] = useState<string | null>(null)
+  const [modelImages, setModelImages] = useState<{ perspective: string; topDown: string } | null>(null)
+  const [modelConfirmed, setModelConfirmed] = useState(false)
 
   const [showPerfil, setShowPerfil] = useState(false)
   const [showDimensoes, setShowDimensoes] = useState(false)
@@ -185,10 +186,7 @@ export default function HomePage() {
     if (form.plantaForma) setShowAcabamentos(true)
   }, [form.plantaForma])
 
-  // Reforma + modelo 3D: aparece assim que temos acabamentos básicos
-  useEffect(() => {
-    if (form.pisoTipo || form.paredeTipo || form.tetoTipo) setShowReforma(true)
-  }, [form.pisoTipo, form.paredeTipo, form.tetoTipo])
+  // Reforma aparece depois que o modelo 3D é confirmado (controlado pelo botão)
 
   useEffect(() => {
     if (form.orcamento && form.prioridade) setShowIdentidade(true)
@@ -202,18 +200,44 @@ export default function HomePage() {
   }, [form.comprimento, form.largura])
 
 
+  async function handleGerarModelo() {
+    setModelLoading(true)
+    setModelError(null)
+    setModelImages(null)
+    setModelConfirmed(false)
+    try {
+      const res = await fetch('/api/modelo3d', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setModelError(data.error ?? 'Erro ao gerar modelo 3D')
+      } else {
+        setModelImages({ perspective: data.perspective, topDown: data.topDown })
+      }
+    } catch (err) {
+      setModelError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setModelLoading(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
-      const screenshots = viewerRef.current?.capture()
+      const sceneImages = modelImages
+        ? [modelImages.perspective, modelImages.topDown]
+        : undefined
       const res = await fetch('/api/gerar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(form as unknown as BriefFormData),
-          sceneImages: screenshots ? [screenshots.perspective, screenshots.topDown] : undefined,
+          sceneImages,
         }),
       })
       const result = await res.json()
@@ -745,32 +769,50 @@ export default function HomePage() {
 
             {/* Levantamento CTA + resultado */}
             <div className="px-8 pb-8 space-y-4">
-              <div className="rounded-2xl border border-[#e5e7eb] bg-[#0d0d1a] overflow-hidden">
-                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-                  <p className="text-[10px] font-bold tracking-[0.15em] text-[#6366f1] uppercase" style={SECTION_STYLE}>3D Space Model</p>
-                  <p className="text-[10px] text-white/30">auto-built from your answers</p>
-                </div>
-                <Suspense fallback={<div className="h-[280px] flex items-center justify-center text-xs text-white/30">Loading 3D viewer…</div>}>
-                  <SpaceViewer3D
-                    ref={viewerRef}
-                    comprimento={form.comprimento}
-                    largura={form.largura}
-                    area={form.area}
-                    alturaPeDireito={form.alturaPeDireito}
-                    peDireito={form.peDireito || 'medio'}
-                    plantaForma={form.plantaForma || 'retangular'}
-                    janelasPos={form.janelasPos || 'so-frente'}
-                    entradaPos={form.entradaPos || 'frente'}
-                    fachada={form.fachada || 'aberta'}
-                    elementosFixos={form.elementosFixos}
-                    pisoTipo={form.pisoTipo || 'cimento-queimado'}
-                    paredeTipo={form.paredeTipo || 'reboco-pintado'}
-                    tetoTipo={form.tetoTipo || 'laje-aparente'}
-                  />
-                </Suspense>
-                <p className="px-4 py-2 text-[10px] text-white/25">
-                  This model is captured automatically when you generate your concept.
-                </p>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleGerarModelo}
+                  disabled={modelLoading || modelConfirmed}
+                  className="w-full py-3.5 rounded-xl bg-[#1f2937] text-white font-semibold text-sm hover:bg-[#111827] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {modelLoading ? 'Building 3D model in SketchUp…' : modelConfirmed ? 'Model confirmed ✓' : 'Generate 3D model'}
+                </button>
+
+                {modelError && (
+                  <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{modelError}</p>
+                )}
+
+                {modelImages && !modelConfirmed && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={modelImages.perspective} alt="Perspective" className="rounded-xl border border-[#e5e7eb] w-full object-cover aspect-video" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={modelImages.topDown} alt="Floor plan" className="rounded-xl border border-[#e5e7eb] w-full object-cover aspect-square" />
+                    </div>
+                    <p className="text-sm font-medium text-[#1f2937] text-center">Does this match your space?</p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => { setModelConfirmed(true); setShowReforma(true) }}
+                        className="flex-1 py-3 rounded-xl bg-[#6366f1] text-white font-semibold text-sm hover:bg-[#4f46e5] transition-colors">
+                        Yes, looks right
+                      </button>
+                      <button type="button" onClick={handleGerarModelo} disabled={modelLoading}
+                        className="flex-1 py-3 rounded-xl border border-[#e5e7eb] text-[#6b7280] font-semibold text-sm hover:bg-[#f8f9fb] transition-colors disabled:opacity-40">
+                        Regenerate
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {modelConfirmed && modelImages && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={modelImages.perspective} alt="Perspective" className="rounded-xl border border-[#6366f1]/20 w-full object-cover aspect-video" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={modelImages.topDown} alt="Floor plan" className="rounded-xl border border-[#6366f1]/20 w-full object-cover aspect-square" />
+                  </div>
+                )}
               </div>
             </div>
           </Section>
