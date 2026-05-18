@@ -57,35 +57,30 @@ function buildSchema(olharOtelie?: string) {
 
 export async function POST(req: Request) {
   try {
-    const { photoBase64, preSpaceAnalysis, ...formData }: BriefFormData & {
-      photoBase64?: string
-      preSpaceAnalysis?: string
+    const { sceneImages, ...formData }: BriefFormData & {
+      sceneImages?: string[]
     } = await req.json()
 
-    let spaceAnalysis = preSpaceAnalysis ?? ''
+    let spaceAnalysis = ''
 
-    if (photoBase64 && !preSpaceAnalysis) {
+    if (sceneImages && sceneImages.length > 0) {
       const { text } = await generateText({
         model: openai('gpt-4o'),
         messages: [{
           role: 'user',
           content: [
-            {
-              type: 'image',
-              image: photoBase64,
-            },
+            ...sceneImages.map((img) => ({ type: 'image' as const, image: img })),
             {
               type: 'text',
-              text: `Você é um arquiteto de interiores. Analise esta foto com máxima precisão arquitetônica e descreva:
-1. Formato da planta baixa (retangular, irregular, L-shape, etc.) e proporções aproximadas
-2. Pé-direito (baixo <2.5m / médio 2.5-3.5m / alto >3.5m) e características do teto
-3. Janelas: quantidade, posição nas paredes (frente/lateral/fundo), tamanho e altura do chão
-4. Portas: posição e quantidade
-5. Elementos estruturais fixos: colunas, pilares, vigas, escadas, mezanino
-6. Direção e qualidade da luz natural
-7. Ângulo e perspectiva da foto (frontal, diagonal, de canto, etc.)
+              text: `These are 3D model screenshots of a commercial space built from the client's answers (perspective view and top-down floor plan). Analyze the spatial geometry with architectural precision:
+1. Floor plan shape and proportions (from top-down view)
+2. Ceiling height relative to floor area
+3. Window positions and coverage
+4. Entrance door position
+5. Structural elements (columns, mezzanine, level changes)
+6. Approximate dimensions and scale
 
-Seja preciso e técnico — esta descrição será usada para recriar o espaço fielmente em uma proposta de design.`,
+Be precise and technical — this spatial description will be used to generate a faithful design concept for this specific space.`,
             },
           ],
         }],

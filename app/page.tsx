@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import type { SpaceViewer3DHandle } from '@/components/SpaceViewer3D'
 import type {
   BriefFormData, SpaceType, Budget, Location, EstadoAtual, LuzNatural, PeDireito, PublicoAlvo, Prioridade,
   CafeModelo, CafeDestaque, CafeAreaExterna,
@@ -10,6 +11,8 @@ import type {
   PlantaForma, JanelasPos, Fachada, ElementoFixo, EntradaPos,
   PisoTipo, ParedeTipo, TetoTipo,
 } from '@/lib/types'
+
+const SpaceViewer3D = lazy(() => import('@/components/SpaceViewer3D'))
 
 type FormState = {
   tipo: SpaceType | ''
@@ -117,9 +120,7 @@ export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const viewerRef = useRef<SpaceViewer3DHandle>(null)
 
   const [showPerfil, setShowPerfil] = useState(false)
   const [showDimensoes, setShowDimensoes] = useState(false)
@@ -127,14 +128,6 @@ export default function HomePage() {
   const [showAcabamentos, setShowAcabamentos] = useState(false)
   const [showReforma, setShowReforma] = useState(false)
   const [showIdentidade, setShowIdentidade] = useState(false)
-
-  const [levantamentoLoading, setLevantamentoLoading] = useState(false)
-  const [levantamentoImage, setLevantamentoImage] = useState<string | null>(null)
-  const [levantamentoError, setLevantamentoError] = useState<string | null>(null)
-  const [levantamentoSpaceAnalysis, setLevantamentoSpaceAnalysis] = useState('')
-  const [levantamentoConfirmed, setLevantamentoConfirmed] = useState(false)
-  const [showCorrecao, setShowCorrecao] = useState(false)
-  const [correcaoText, setCorrecaoText] = useState('')
 
   const [form, setForm] = useState<FormState>({
     tipo: '',
@@ -192,6 +185,11 @@ export default function HomePage() {
     if (form.plantaForma) setShowAcabamentos(true)
   }, [form.plantaForma])
 
+  // Reforma + modelo 3D: aparece assim que temos acabamentos básicos
+  useEffect(() => {
+    if (form.pisoTipo || form.paredeTipo || form.tetoTipo) setShowReforma(true)
+  }, [form.pisoTipo, form.paredeTipo, form.tetoTipo])
+
   useEffect(() => {
     if (form.orcamento && form.prioridade) setShowIdentidade(true)
   }, [form.orcamento, form.prioridade])
@@ -203,77 +201,24 @@ export default function HomePage() {
     }
   }, [form.comprimento, form.largura])
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string
-      setPhotoBase64(base64)
-      setPhotoPreview(base64)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  function removePhoto() {
-    setPhotoBase64(null)
-    setPhotoPreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  async function handleAnalisar() {
-    setLevantamentoLoading(true)
-    setLevantamentoImage(null)
-    setLevantamentoError(null)
-    setLevantamentoConfirmed(false)
-    setShowCorrecao(false)
-    try {
-      const res = await fetch('/api/levantamento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(form as unknown as BriefFormData),
-          photoBase64,
-          correcao: correcaoText || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setLevantamentoError(data.error ?? 'Erro ao analisar espaço')
-      } else {
-        setLevantamentoImage(data.imageUrl)
-        setLevantamentoSpaceAnalysis(data.spaceAnalysis ?? '')
-      }
-    } catch (err) {
-      setLevantamentoError(err instanceof Error ? err.message : 'Erro desconhecido')
-    } finally {
-      setLevantamentoLoading(false)
-    }
-  }
-
-  function handleConfirmar() {
-    setLevantamentoConfirmed(true)
-    setShowReforma(true)
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
+      const screenshots = viewerRef.current?.capture()
       const res = await fetch('/api/gerar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(form as unknown as BriefFormData),
-          photoBase64: levantamentoSpaceAnalysis ? undefined : photoBase64,
-          preSpaceAnalysis: levantamentoSpaceAnalysis || undefined,
+          sceneImages: screenshots ? [screenshots.perspective, screenshots.topDown] : undefined,
         }),
       })
       const result = await res.json()
       if (!res.ok) { setError(result.error ?? 'Erro ao gerar conceito.'); setLoading(false); return }
-      if (photoBase64) sessionStorage.setItem('otelie_photo', photoBase64)
-      else sessionStorage.removeItem('otelie_photo')
+      sessionStorage.removeItem('otelie_photo')
       const encoded = encodeURIComponent(JSON.stringify({ result, form }))
       router.push(`/resultado?data=${encoded}`)
     } catch (err) {
@@ -800,82 +745,33 @@ export default function HomePage() {
 
             {/* Levantamento CTA + resultado */}
             <div className="px-8 pb-8 space-y-4">
-              <div className="rounded-2xl border border-[#e5e7eb] bg-[#f8f9fb] p-5">
-                <p className="text-xs font-semibold text-[#1f2937] mb-1">Photo of the current space</p>
-                <p className="text-xs text-[#9ca3af] mb-3">Adding a photo significantly improves the accuracy of the analysis.</p>
-                {photoPreview ? (
-                  <div className="relative rounded-xl overflow-hidden border border-[#e5e7eb] mb-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photoPreview} alt="Espaço atual" className="w-full h-36 object-cover" />
-                    <button type="button" onClick={removePhoto}
-                      className="absolute top-2 right-2 bg-white/90 rounded-full px-2.5 py-0.5 text-xs text-[#6b7280] hover:text-[#1f2937] border border-[#e5e7eb]">
-                      Remover
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-20 rounded-xl border border-dashed border-[#d1d5db] bg-white text-[#9ca3af] text-xs hover:border-[#6366f1] hover:text-[#6366f1] transition-all flex items-center justify-center gap-2 mb-3">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                    Add photo
-                  </button>
-                )}
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+              <div className="rounded-2xl border border-[#e5e7eb] bg-[#0d0d1a] overflow-hidden">
+                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                  <p className="text-[10px] font-bold tracking-[0.15em] text-[#6366f1] uppercase" style={SECTION_STYLE}>3D Space Model</p>
+                  <p className="text-[10px] text-white/30">auto-built from your answers</p>
+                </div>
+                <Suspense fallback={<div className="h-[280px] flex items-center justify-center text-xs text-white/30">Loading 3D viewer…</div>}>
+                  <SpaceViewer3D
+                    ref={viewerRef}
+                    comprimento={form.comprimento}
+                    largura={form.largura}
+                    area={form.area}
+                    alturaPeDireito={form.alturaPeDireito}
+                    peDireito={form.peDireito || 'medio'}
+                    plantaForma={form.plantaForma || 'retangular'}
+                    janelasPos={form.janelasPos || 'so-frente'}
+                    entradaPos={form.entradaPos || 'frente'}
+                    fachada={form.fachada || 'aberta'}
+                    elementosFixos={form.elementosFixos}
+                    pisoTipo={form.pisoTipo || 'cimento-queimado'}
+                    paredeTipo={form.paredeTipo || 'reboco-pintado'}
+                    tetoTipo={form.tetoTipo || 'laje-aparente'}
+                  />
+                </Suspense>
+                <p className="px-4 py-2 text-[10px] text-white/25">
+                  This model is captured automatically when you generate your concept.
+                </p>
               </div>
-
-              <button type="button" onClick={handleAnalisar}
-                disabled={levantamentoLoading || levantamentoConfirmed}
-                className="w-full py-3.5 rounded-xl bg-[#1f2937] text-white font-semibold text-sm hover:bg-[#111827] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                {levantamentoLoading ? 'Analyzing space…' : levantamentoConfirmed ? 'Space confirmed' : 'Analyze current space'}
-              </button>
-
-              {levantamentoError && (
-                <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{levantamentoError}</p>
-              )}
-
-              {levantamentoImage && !levantamentoConfirmed && (
-                <div className="space-y-3">
-                  <div className="rounded-xl overflow-hidden border border-[#e5e7eb] aspect-video">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={levantamentoImage} alt="Levantamento" className="w-full h-full object-cover image-fadein" />
-                  </div>
-                  <p className="text-sm font-medium text-[#1f2937] text-center">Does this look like your space?</p>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={handleConfirmar}
-                      className="flex-1 py-3 rounded-xl bg-[#6366f1] text-white font-semibold text-sm hover:bg-[#4f46e5] transition-colors">
-                      Yes, that's right
-                    </button>
-                    <button type="button" onClick={() => setShowCorrecao(v => !v)}
-                      className="flex-1 py-3 rounded-xl border border-[#e5e7eb] text-[#6b7280] font-semibold text-sm hover:bg-[#f8f9fb] transition-colors">
-                      No, let me correct it
-                    </button>
-                  </div>
-                  {showCorrecao && (
-                    <div className="space-y-2">
-                      <textarea rows={3}
-                        placeholder="What's wrong? e.g. the floor is dark hardwood, walls are white, there's a column in the center…"
-                        value={correcaoText} onChange={e => setCorrecaoText(e.target.value)}
-                        className="w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3 text-sm text-[#1f2937] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#6366f1] resize-none"
-                      />
-                      <button type="button" onClick={handleAnalisar} disabled={levantamentoLoading}
-                        className="w-full py-2.5 rounded-xl border border-[#1f2937] text-[#1f2937] font-semibold text-sm hover:bg-[#f8f9fb] transition-colors disabled:opacity-40">
-                        {levantamentoLoading ? 'Regenerating…' : 'Regenerate visualization'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {levantamentoConfirmed && levantamentoImage && (
-                <div className="rounded-xl overflow-hidden border border-[#6366f1]/20 aspect-video relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={levantamentoImage} alt="Levantamento confirmado" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-2 left-2 bg-[#6366f1]/80 text-white text-[10px] font-medium px-2 py-0.5 rounded-full tracking-wide">Space confirmed</span>
-                </div>
-              )}
             </div>
           </Section>
 
