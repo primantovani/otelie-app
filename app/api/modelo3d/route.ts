@@ -9,6 +9,7 @@ export const maxDuration = 60
 const PATHS = {
   perspective: '/tmp/otelie_perspective.png',
   topDown:     '/tmp/otelie_topdown.png',
+  planta:      '/tmp/otelie_planta.png',
 }
 
 function readImageBase64(path: string): string | null {
@@ -37,12 +38,13 @@ export async function POST(req: Request) {
 
     const perspective = readImageBase64(PATHS.perspective)
     const topDown     = readImageBase64(PATHS.topDown)
+    const planta      = readImageBase64(PATHS.planta)
 
     if (!perspective || !topDown) {
       return Response.json({ error: 'Screenshots não foram geradas. Verifique o SketchUp.' }, { status: 500 })
     }
 
-    return Response.json({ perspective, topDown })
+    return Response.json({ perspective, topDown, planta })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('Erro /api/modelo3d:', message)
