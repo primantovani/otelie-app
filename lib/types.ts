@@ -6,7 +6,52 @@ export type TetoTipo = 'laje-aparente' | 'forro-gesso' | 'forro-madeira' | 'stee
 export type PlantaForma = 'corredor' | 'retangular' | 'quadrado' | 'formato-l' | 'irregular'
 export type JanelasPos = 'so-frente' | 'frente-lateral' | 'so-lateral' | 'sem-janelas'
 export type Fachada = 'aberta' | 'semi-aberta' | 'fechada' | 'interior'
-export type ElementoFixo = 'pilares' | 'desnivel' | 'mezanino' | 'escadas'
+export type ElementoFixo = 'pilares' | 'desnivel' | 'mezanino'
+
+export type EscadaCustom = {
+  parede: EntradaPos
+  posicaoH: PosicaoH
+  largura: number  // meters
+}
+export type PosicaoInterna = 'canto-ne' | 'canto-nw' | 'canto-se' | 'canto-sw' | 'fundo-centro' | 'lateral'
+export type AmbienteInterno = {
+  nome?: string
+  posicao: PosicaoInterna
+  largura?: number | null
+  profundidade?: number | null
+}
+
+export type PosicaoH = 'esq' | 'centro' | 'dir'
+export type MovelTipo = 'bancada' | 'balcao' | 'prateleira' | 'ilha'
+
+export type JanelaCustom = {
+  parede: EntradaPos
+  posicaoH: PosicaoH
+  largura: number
+  altura: number
+  peitoril?: number | null
+}
+
+export type PortaInterna = {
+  parede: EntradaPos
+  posicaoH: PosicaoH
+  largura: number
+}
+
+export type PilarCustom = {
+  posX: number
+  posY: number
+  diametro: number
+}
+
+export type MovelFixo = {
+  tipo: MovelTipo
+  parede: EntradaPos | 'centro'
+  posicaoH: PosicaoH
+  largura: number
+  profundidade: number
+  altura: number
+}
 export type Budget = 'ate50k' | '50k-150k' | '150k-300k' | 'acima300k'
 export type Location = 'terreo-urbano' | 'shopping' | 'rua-bairro' | 'outro'
 export type EstadoAtual = 'obra-bruta' | 'ja-funciona' | 'precisa-refresh'
@@ -56,10 +101,17 @@ export interface BriefFormData {
   tetoFica?: boolean
   // Ambiente
   entradaPos?: EntradaPos
+  portaLargura?: number
+  ambientesInternos?: AmbienteInterno[]
+  janelasCustom?: JanelaCustom[]
+  portasInternas?: PortaInterna[]
+  pilaresCustom?: PilarCustom[]
+  moveisFixos?: MovelFixo[]
   plantaForma?: PlantaForma
   janelasPos?: JanelasPos
   fachada?: Fachada
   elementosFixos?: ElementoFixo[]
+  escadasCustom?: EscadaCustom[]
   // Café
   cafeModelo?: CafeModelo
   cafeDestaque?: CafeDestaque

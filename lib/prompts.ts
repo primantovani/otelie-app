@@ -53,7 +53,6 @@ function buildAmbienteContext(data: BriefFormData): string {
       pilares: 'structural columns/pillars',
       desnivel: 'floor level change',
       mezanino: 'mezzanine',
-      escadas: 'internal stairs',
     }
     parts.push(`Fixed non-removable elements: ${data.elementosFixos.map(e => map[e]).join(', ')}`)
   }
