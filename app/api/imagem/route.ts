@@ -1,7 +1,9 @@
 import OpenAI from 'openai'
 import type { BriefResult, BriefFormData } from '@/lib/types'
+import { IMAGE_RATES, type RouteDebugPayload } from '@/lib/ai-costs'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120
 
 export async function POST(req: Request) {
   const { result, form, spaceAnalysis }: {
@@ -16,6 +18,7 @@ export async function POST(req: Request) {
     + (spaceAnalysis ? ` Existing space structure: ${spaceAnalysis}` : '')
 
   try {
+    const t0 = Date.now()
     const image = await client.images.generate({
       model: 'gpt-image-1',
       prompt,
@@ -23,11 +26,20 @@ export async function POST(req: Request) {
       size: '1536x1024',
       quality: 'high',
     })
+    const durationMs = Date.now() - t0
 
     const b64 = image.data?.[0]?.b64_json
     if (!b64) return Response.json({ error: 'Sem imagem na resposta' }, { status: 500 })
 
-    return Response.json({ url: `data:image/png;base64,${b64}` })
+    const cost = IMAGE_RATES['gpt-image-1:high:1536x1024'] ?? 0
+    const _debug: RouteDebugPayload = {
+      endpoint: '/api/imagem',
+      calls: [{ label: 'Renderização de cena', model: 'gpt-image-1', estimatedCostUsd: cost, durationMs }],
+      totalCostUsd: cost,
+      totalDurationMs: durationMs,
+    }
+
+    return Response.json({ url: `data:image/png;base64,${b64}`, _debug })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('Erro /api/imagem:', message)

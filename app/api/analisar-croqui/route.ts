@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
+import { calcTokenCost, type RouteDebugPayload } from '@/lib/ai-costs'
 
 export const maxDuration = 30
 
@@ -9,9 +10,9 @@ const schema = z.object({
   plantaForma: z.enum(['corredor', 'retangular', 'quadrado', 'formato-l', 'irregular'])
     .describe('Overall shape of the floor plan'),
   comprimento: z.number().nullable()
-    .describe('Longest dimension in meters. Null if no scale reference visible.'),
+    .describe('Total depth of the space in meters — distance from the FRONT WALL (entrance) to the BACK WALL. Null if no scale reference visible.'),
   largura: z.number().nullable()
-    .describe('Shortest dimension in meters. Null if no scale reference visible.'),
+    .describe('Total width of the FRONT WALL in meters — left to right as seen from the entrance. Null if no scale reference visible.'),
   area: z.number()
     .describe('Estimated floor area in m². Use dimensions if available, else estimate from proportions assuming typical small commercial space 30-150m².'),
   peDireito: z.enum(['baixo', 'medio', 'alto']).nullable()
@@ -28,6 +29,13 @@ const schema = z.object({
     .describe('Storefront type if identifiable from the drawing. Null if unclear.'),
   elementosFixos: z.array(z.enum(['pilares', 'desnivel', 'mezanino', 'escadas']))
     .describe('Fixed structural elements visible: pilares=column circles/dots, desnivel=floor level change lines, mezanino=dashed mezzanine outline, escadas=stair symbol.'),
+  ambientesInternos: z.array(z.object({
+    nome: z.string().describe('Room name/type: Banheiro, Copa, Depósito, Escritório, etc.'),
+    posicao: z.enum(['canto-sw','canto-se','canto-nw','canto-ne','fundo-centro','lateral'])
+      .describe('Location inside the main perimeter. sw=front-left, se=front-right, nw=back-left, ne=back-right.'),
+    largura: z.number().nullable().describe('Room width in meters parallel to front/back wall. Null if not measurable.'),
+    profundidade: z.number().nullable().describe('Room depth in meters parallel to side walls. Null if not measurable.'),
+  })).describe('Internal rooms defined by partition walls inside the main perimeter. Empty array if no internal subdivisions visible.'),
   confidence: z.enum(['high', 'medium', 'low'])
     .describe('Overall confidence in the extraction.'),
   notes: z.string()
@@ -36,11 +44,12 @@ const schema = z.object({
 
 const PROMPT = `Você é um arquiteto experiente analisando um croqui de planta baixa de um espaço comercial (café, bistrô ou sorveteria).
 
-PASSO 1 — Identifique as paredes e o perímetro do espaço.
+PASSO 1 — Identifique as paredes externas (perímetro) e as paredes internas (divisórias).
 PASSO 2 — Localize as PORTAS: uma porta é representada por um vão na parede + um arco de quarto de círculo (o traço da folha girando). O raio do arco = largura da porta. Se houver cota de dimensão sobre o vão, use esse valor.
 PASSO 3 — Localize as JANELAS: interrupção fina na parede SEM arco, geralmente com duas linhas paralelas.
 PASSO 4 — Determine a posição da entrada principal (porta voltada para a rua/fachada).
-PASSO 5 — Leia as cotas: se houver números com setas ou linhas de cota, extraia comprimento, largura e largura da porta.
+PASSO 5 — Leia as cotas: extraia comprimento (profundidade frente→fundo) e largura (largura da parede de entrada, esquerda→direita). Se as cotas estiverem anotadas como "8,00 × 6,00m", a primeira medida horizontal (paralela à entrada) é a largura; a vertical (da entrada ao fundo) é o comprimento.
+PASSO 6 — Identifique ambientes internos: áreas delimitadas por paredes internas dentro do perímetro. Para cada ambiente, determine: nome (Banheiro, Copa, Depósito…), posição no espaço (canto-sw/se/nw/ne, fundo-centro, lateral) e dimensões se legíveis.
 
 Convenções brasileiras de planta baixa:
 - Orientação padrão: Sul = parte inferior, Norte = parte superior
@@ -64,8 +73,10 @@ export async function POST(req: NextRequest) {
     const { imageBase64, mimeType = 'image/jpeg' } = await req.json()
     if (!imageBase64) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
 
-    const { object } = await generateObject({
-      model: anthropic('claude-opus-4-5'),
+    const t0 = Date.now()
+    const MODEL = 'claude-opus-4-5'
+    const { object, usage } = await generateObject({
+      model: anthropic(MODEL),
       schema,
       messages: [{
         role: 'user',
@@ -79,8 +90,24 @@ export async function POST(req: NextRequest) {
         ],
       }],
     })
+    const durationMs = Date.now() - t0
 
-    return NextResponse.json(object)
+    const cost = calcTokenCost(MODEL, usage.inputTokens, usage.outputTokens)
+    const _debug: RouteDebugPayload = {
+      endpoint: '/api/analisar-croqui',
+      calls: [{
+        label: 'Analisar croqui',
+        model: MODEL,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        estimatedCostUsd: cost,
+        durationMs,
+      }],
+      totalCostUsd: cost,
+      totalDurationMs: durationMs,
+    }
+
+    return NextResponse.json({ ...object, _debug })
   } catch (err) {
     console.error('[analisar-croqui]', err)
     return NextResponse.json(

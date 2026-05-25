@@ -231,6 +231,160 @@ export const t = {
     uploadChange: 'Change',
     uploadAiBadge: 'AI',
     uploadError: 'Could not read the sketch. Try a clearer image or fill manually.',
+
+    // ── Briefing form (stage 1) ──
+    bfTagline: 'Concept Redesign™',
+    bfLangToggle: 'PT',
+    bfStep1: 'Survey',
+    bfStep2: 'Needs',
+    bfStep3: 'Concept',
+
+    // Stage 1
+    bfCroqui: 'Floor plan sketch',
+    bfCroquiOptional: 'optional',
+    bfCroquiHint: 'Can be a hand sketch, photo or CAD file. Layout and measurements are what matter.',
+    bfCroquiDrop: 'Drag or click — photo, scan or digital',
+    bfCroquiAiNote: 'AI extracts geometry and space elements',
+    bfCroquiLoaded: 'Sketch loaded',
+    bfCroquiAnalyze: 'Analyze',
+    bfCroquiAnalyzing: 'Analyzing…',
+    bfCroquiRemove: 'Remove',
+    bfPlanta: 'Floor plan',
+    bfDimensoes: 'Dimensions',
+    bfDimensoesOptional: 'optional',
+    bfComprimento: 'Length (back) — ft',
+    bfLargura: 'Width (front) — ft',
+    bfAreaAprox: 'Approximate area',
+    bfAutoCalc: 'auto-calculated',
+    bfPeDireito: 'Ceiling height',
+    bfPeDireitoPlaceholder: 'e.g. 9.5',
+    bfPeDireitoUnit: 'ft',
+    bfFotos: 'Space photos',
+    bfFotosNote: 'Required to generate the initial concept',
+    bfFotosAmberNote: 'If the space has distinctive details (exposed structure, interesting flooring, unusual walls), send a photo of them in the "Details" category.',
+    bfAcabamentos: 'Finishes',
+    bfPiso: 'Floor',
+    bfParede: 'Walls',
+    bfTeto: 'Ceiling',
+    bfContinuar: 'Continue to needs →',
+    bfContinuarFotos: 'Add the 3 required photos in the Survey to continue.',
+
+    // Stage 2
+    bfTipoUso: 'Type of use',
+    bfPerfilPublico: 'Target audience',
+    bfPerfilPublicoHint: '(select all that apply)',
+    bfDemandaFuncional: 'Functional requirements',
+    bfCapacidade: 'Estimated capacity',
+    bfCapacidadePlaceholder: 'e.g. 40 people, 12 tables, 3 offices…',
+    bfConceito: 'Desired concept',
+    bfConceitoPlaceholder: 'Other style or keyword…',
+    bfMarca: 'Brand',
+    bfNomeMarca: 'Brand name',
+    bfNomeMarcaPlaceholder: 'e.g. Café Dumont',
+    bfRedeSocial: 'Official social media',
+    bfRedeSocialPlaceholder: '@handle or profile URL',
+    bfPrimeiraUnidade: 'First location?',
+    bfPrimeiraUnidadeSim: 'Yes, first location',
+    bfPrimeiraUnidadeNao: 'No, we already operate',
+    bfReferencias: 'Visual references',
+    bfReferenciasOptional: 'optional',
+    bfReferenciasHint: 'Images of spaces that inspire the desired concept',
+    bfReferenciasAdd: '+ Add reference image',
+    bfRestricoes: 'Restrictions & budget',
+    bfOrcamento: 'Estimated budget',
+    bfPrazo: 'Timeline',
+    bfRestricoesLabel: 'Specific restrictions',
+    bfRestricoesOptional: 'optional',
+    bfRestricoesPlaceholder: 'e.g. cannot change structure, items to keep, local regulations…',
+
+    // Type of use options
+    bfCafe: 'Café / Coffee Shop',
+    bfRestaurante: 'Small Restaurant',
+    bfSorveteria: 'Ice Cream Shop',
+    bfBar: 'Bar',
+    bfLoja: 'Store / Retail',
+    bfEscritorio: 'Office',
+    bfGaleria: 'Gallery / Showroom',
+    bfClinica: 'Clinic / Health',
+    bfSalao: 'Salon / Beauty',
+    bfOutro: 'Other',
+
+    // Public profile options
+    bfJovem: 'Young / Casual',
+    bfCorporativo: 'Corporate',
+    bfFamilia: 'Family',
+    bfPremium: 'Premium / Upscale',
+    bfTurista: 'Tourist',
+    bfArtistico: 'Artistic / Cultural',
+
+    // Concept presets
+    bfMinimalista: 'Minimalist',
+    bfIndustrial: 'Industrial',
+    bfAconchegante: 'Cozy',
+    bfContemporaneo: 'Contemporary',
+
+    // Budget options
+    bfAte50k: 'Up to R$ 50k',
+    bf50k150k: 'R$ 50k – 150k',
+    bf150k300k: 'R$ 150k – 300k',
+    bfAcima300k: 'Above R$ 300k',
+
+    // Timeline options
+    bfUrgente: 'Urgent (< 1 month)',
+    bf1a3meses: '1 to 3 months',
+    bf3a6meses: '3 to 6 months',
+    bfSemPrazo: 'No set deadline',
+
+    // Finishes — floor
+    bfCimento: 'Polished concrete',
+    bfCeramica: 'Ceramic / porcelain',
+    bfMadeira: 'Hardwood',
+    bfVinilico: 'Vinyl (LVT)',
+    bfPedra: 'Natural stone',
+    bfOutroAcab: 'Other',
+
+    // Finishes — walls
+    bfReboco: 'Painted plaster',
+    bfTijolo: 'Exposed brick',
+    bfAzulejo: 'Ceramic tile',
+    bfDrywall: 'Drywall',
+    bfConcreto: 'Exposed concrete',
+
+    // Finishes — ceiling
+    bfForroGesso: 'Drywall / plaster',
+    bfForroMadeira: 'Wood panel',
+    bfLaje: 'Exposed slab',
+    bfSteelDeck: 'Steel deck',
+
+    // Photo categories
+    bfFotoFachada: 'Facade / Entrance',
+    bfFotoIntFundo: 'Interior → back',
+    bfFotoIntFrente: 'Interior → entrance',
+    bfFotoLatEsq: 'Left side',
+    bfFotoLatDir: 'Right side',
+    bfFotoDetalhes: 'Details',
+    bfFotoReq: 'Required',
+
+    // Buttons
+    bfSolicitar: 'Request Initial Concept',
+    bfPreview: 'Preview concept with AI',
+    bfFotosObrigatorias: 'Add the 3 required photos in the Survey to request.',
+    bfAddNow: 'Add now',
+
+    // Success
+    bfSuccessTag: 'Concept requested',
+    bfSuccessTitle: 'Briefing received!',
+    bfSuccessMsg: 'Your initial concept will be available here and will arrive by email within 24 hours.',
+    bfSuccessRef: 'Project reference',
+    bfSuccessStep1: 'Briefing received',
+    bfSuccessStep2: 'Concept in development',
+    bfSuccessStep3: 'Initial concept delivered',
+    bfSuccessRequestAgain: 'Request another concept',
+
+    // Pé-direito labels
+    bfPeBaixo: 'low',
+    bfPeMedio: 'medium',
+    bfPeAlto: 'high',
   },
 
   pt: {
@@ -463,6 +617,160 @@ export const t = {
     uploadChange: 'Trocar',
     uploadAiBadge: 'IA',
     uploadError: 'Não foi possível ler o croqui. Tente uma imagem mais nítida ou preencha manualmente.',
+
+    // ── Briefing form (stage 1) ──
+    bfTagline: 'Concept Redesign™',
+    bfLangToggle: 'EN',
+    bfStep1: 'Levantamento',
+    bfStep2: 'Necessidades',
+    bfStep3: 'Concept',
+
+    // Stage 1
+    bfCroqui: 'Croqui de planta',
+    bfCroquiOptional: 'opcional',
+    bfCroquiHint: 'Pode ser croqui à mão, foto de planta ou arquivo CAD. O formato não importa — o que conta é ter a disposição dos ambientes e as medidas.',
+    bfCroquiDrop: 'Arraste ou clique — foto, scan ou digital',
+    bfCroquiAiNote: 'A IA extrai geometria e elementos do espaço',
+    bfCroquiLoaded: 'Croqui carregado',
+    bfCroquiAnalyze: 'Analisar',
+    bfCroquiAnalyzing: 'Analisando…',
+    bfCroquiRemove: 'Remover',
+    bfPlanta: 'Planta',
+    bfDimensoes: 'Dimensões',
+    bfDimensoesOptional: 'opcional',
+    bfComprimento: 'Comprimento (fundo)',
+    bfLargura: 'Largura (frente)',
+    bfAreaAprox: 'Área aproximada',
+    bfAutoCalc: 'calculado automaticamente',
+    bfPeDireito: 'Pé-direito',
+    bfPeDireitoPlaceholder: 'ex: 2,80',
+    bfPeDireitoUnit: 'm',
+    bfFotos: 'Fotos do espaço',
+    bfFotosNote: 'Obrigatórias para gerar o concept inicial',
+    bfFotosAmberNote: 'Se o espaço tiver detalhes marcantes (estrutura aparente, piso interessante, paredes incomuns), envie foto deles na categoria "Detalhes".',
+    bfAcabamentos: 'Acabamentos',
+    bfPiso: 'Piso',
+    bfParede: 'Paredes',
+    bfTeto: 'Teto',
+    bfContinuar: 'Continuar para necessidades →',
+    bfContinuarFotos: 'Adicione as 3 fotos obrigatórias no Levantamento para continuar.',
+
+    // Stage 2
+    bfTipoUso: 'Tipo de uso',
+    bfPerfilPublico: 'Perfil do público',
+    bfPerfilPublicoHint: '(selecione todos)',
+    bfDemandaFuncional: 'Demanda funcional',
+    bfCapacidade: 'Capacidade estimada',
+    bfCapacidadePlaceholder: 'Ex: 40 pessoas, 12 mesas, 3 consultórios…',
+    bfConceito: 'Conceito desejado',
+    bfConceitoPlaceholder: 'Outro estilo ou palavra-chave…',
+    bfMarca: 'Marca',
+    bfNomeMarca: 'Nome da marca',
+    bfNomeMarcaPlaceholder: 'Ex: Café Dumont',
+    bfRedeSocial: 'Rede social oficial',
+    bfRedeSocialPlaceholder: '@usuario ou link do perfil',
+    bfPrimeiraUnidade: 'É a primeira unidade?',
+    bfPrimeiraUnidadeSim: 'Sim, primeira unidade',
+    bfPrimeiraUnidadeNao: 'Não, já operamos',
+    bfReferencias: 'Referências visuais',
+    bfReferenciasOptional: 'opcional',
+    bfReferenciasHint: 'Imagens de espaços que inspiram o conceito desejado',
+    bfReferenciasAdd: '+ Adicionar imagem de referência',
+    bfRestricoes: 'Restrições e orçamento',
+    bfOrcamento: 'Orçamento estimado',
+    bfPrazo: 'Prazo',
+    bfRestricoesLabel: 'Restrições específicas',
+    bfRestricoesOptional: 'opcional',
+    bfRestricoesPlaceholder: 'Ex: não pode alterar estrutura, itens que devem ser aproveitados, normas do local…',
+
+    // Type of use options
+    bfCafe: 'Cafeteria',
+    bfRestaurante: 'Pequeno restaurante',
+    bfSorveteria: 'Sorveteria',
+    bfBar: 'Bar',
+    bfLoja: 'Loja / Varejo',
+    bfEscritorio: 'Escritório',
+    bfGaleria: 'Galeria / Showroom',
+    bfClinica: 'Clínica / Saúde',
+    bfSalao: 'Salão / Estética',
+    bfOutro: 'Outro',
+
+    // Public profile options
+    bfJovem: 'Jovem / Casual',
+    bfCorporativo: 'Corporativo',
+    bfFamilia: 'Família',
+    bfPremium: 'Premium / Alto padrão',
+    bfTurista: 'Turista',
+    bfArtistico: 'Artístico / Cultural',
+
+    // Concept presets
+    bfMinimalista: 'Minimalista',
+    bfIndustrial: 'Industrial',
+    bfAconchegante: 'Aconchegante',
+    bfContemporaneo: 'Contemporâneo',
+
+    // Budget options
+    bfAte50k: 'Até R$ 50k',
+    bf50k150k: 'R$ 50k – 150k',
+    bf150k300k: 'R$ 150k – 300k',
+    bfAcima300k: 'Acima de R$ 300k',
+
+    // Timeline options
+    bfUrgente: 'Urgente (< 1 mês)',
+    bf1a3meses: '1 a 3 meses',
+    bf3a6meses: '3 a 6 meses',
+    bfSemPrazo: 'Sem prazo definido',
+
+    // Finishes — floor
+    bfCimento: 'Cimento queimado',
+    bfCeramica: 'Cerâmica / porcelanato',
+    bfMadeira: 'Madeira',
+    bfVinilico: 'Vinílico (LVT)',
+    bfPedra: 'Pedra natural',
+    bfOutroAcab: 'Outro',
+
+    // Finishes — walls
+    bfReboco: 'Reboco pintado',
+    bfTijolo: 'Tijolo aparente',
+    bfAzulejo: 'Azulejo',
+    bfDrywall: 'Drywall',
+    bfConcreto: 'Laje aparente',
+
+    // Finishes — ceiling
+    bfForroGesso: 'Forro de gesso',
+    bfForroMadeira: 'Forro de madeira',
+    bfLaje: 'Laje aparente',
+    bfSteelDeck: 'Steel deck',
+
+    // Photo categories
+    bfFotoFachada: 'Fachada / Entrada',
+    bfFotoIntFundo: 'Interior → fundo',
+    bfFotoIntFrente: 'Interior → entrada',
+    bfFotoLatEsq: 'Lateral esquerda',
+    bfFotoLatDir: 'Lateral direita',
+    bfFotoDetalhes: 'Detalhes',
+    bfFotoReq: 'Obrigatória',
+
+    // Buttons
+    bfSolicitar: 'Solicitar Concept Inicial',
+    bfPreview: 'Ver concept preview com IA',
+    bfFotosObrigatorias: 'Adicione as 3 fotos obrigatórias no Levantamento para solicitar o projeto.',
+    bfAddNow: 'Adicionar agora',
+
+    // Success
+    bfSuccessTag: 'Concept solicitado',
+    bfSuccessTitle: 'Briefing recebido!',
+    bfSuccessMsg: 'Seu concept inicial estará disponível aqui e chegará por e-mail em até 24 horas.',
+    bfSuccessRef: 'Referência do projeto',
+    bfSuccessStep1: 'Briefing recebido',
+    bfSuccessStep2: 'Concept em desenvolvimento',
+    bfSuccessStep3: 'Concept inicial entregue',
+    bfSuccessRequestAgain: 'Solicitar outro concept',
+
+    // Pé-direito labels
+    bfPeBaixo: 'baixo',
+    bfPeMedio: 'médio',
+    bfPeAlto: 'alto',
   },
 } as const
 

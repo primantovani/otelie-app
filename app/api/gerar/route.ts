@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { buildPrompt } from '@/lib/prompts'
 import type { BriefFormData } from '@/lib/types'
+import { calcTokenCost, type DebugCall, type RouteDebugPayload } from '@/lib/ai-costs'
 
 function buildSchema(olharOtelie?: string) {
   return z.object({
@@ -61,11 +62,14 @@ export async function POST(req: Request) {
       sceneImages?: string[]
     } = await req.json()
 
+    const MODEL = 'gpt-4o'
+    const debugCalls: DebugCall[] = []
     let spaceAnalysis = ''
 
     if (sceneImages && sceneImages.length > 0) {
-      const { text } = await generateText({
-        model: openai('gpt-4o'),
+      const t0 = Date.now()
+      const { text, usage } = await generateText({
+        model: openai(MODEL),
         messages: [{
           role: 'user',
           content: [
@@ -86,15 +90,39 @@ Be precise and technical — this spatial description will be used to generate a
         }],
       })
       spaceAnalysis = text
+      debugCalls.push({
+        label: 'Análise visual 3D',
+        model: MODEL,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        estimatedCostUsd: calcTokenCost(MODEL, usage.inputTokens, usage.outputTokens),
+        durationMs: Date.now() - t0,
+      })
     }
 
-    const { object } = await generateObject({
-      model: openai('gpt-4o'),
+    const t1 = Date.now()
+    const { object, usage: usage2 } = await generateObject({
+      model: openai(MODEL),
       schema: buildSchema(formData.olharOtelie),
       prompt: buildPrompt(formData, spaceAnalysis),
     })
+    debugCalls.push({
+      label: 'Geração de conceito',
+      model: MODEL,
+      inputTokens: usage2.inputTokens,
+      outputTokens: usage2.outputTokens,
+      estimatedCostUsd: calcTokenCost(MODEL, usage2.inputTokens, usage2.outputTokens),
+      durationMs: Date.now() - t1,
+    })
 
-    return Response.json({ ...object, spaceAnalysis })
+    const _debug: RouteDebugPayload = {
+      endpoint: '/api/gerar',
+      calls: debugCalls,
+      totalCostUsd: debugCalls.reduce((s, c) => s + c.estimatedCostUsd, 0),
+      totalDurationMs: debugCalls.reduce((s, c) => s + c.durationMs, 0),
+    }
+
+    return Response.json({ ...object, spaceAnalysis, _debug })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('Erro /api/gerar:', message)

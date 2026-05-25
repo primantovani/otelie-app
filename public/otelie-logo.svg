@@ -1,0 +1,40 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Logo Otelie</title>
+  <desc id="desc">Logo minimalista da marca Otelie em dourado e verde escuro, com símbolo abstrato acima do nome em letras minúsculas.</desc>
+  <rect width="1200" height="900" fill="#FFFFFF"/>
+
+  <!-- Símbolo -->
+  <g transform="translate(0, -20)">
+    <!-- arco dourado -->
+    <path d="M600 155
+             C516 155 448 223 448 307
+             L448 421
+             C448 505 516 573 600 573
+             L600 517
+             C547 517 504 474 504 421
+             L504 307
+             C504 254 547 211 600 211
+             C653 211 696 254 696 307
+             L696 405
+             C696 420 708 432 723 432
+             L752 432
+             L752 307
+             C752 223 684 155 600 155Z" fill="#D1A23A"/>
+
+    <!-- tigela abstrata verde -->
+    <path d="M642 464
+             L754 464
+             C754 510 716 547 669 547
+             C623 547 586 510 586 464
+             L642 464Z" fill="#073428"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="600" y="705"
+        text-anchor="middle"
+        font-family="Poppins, Avenir Next, Inter, Arial, sans-serif"
+        font-size="148"
+        font-weight="700"
+        letter-spacing="-6"
+        fill="#073428">otelie</text>
+</svg>

@@ -1,28 +1,32 @@
 import type { Metadata } from 'next'
-import { DM_Sans, DM_Mono } from 'next/font/google'
+import { Nunito, Inter } from 'next/font/google'
 import './globals.css'
+import DebugPanel from '@/components/DebugPanel'
 
-const dmSans = DM_Sans({
+const nunito = Nunito({
   subsets: ['latin'],
-  weight: ['300', '400', '500'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-sans',
 })
 
-const dmMono = DM_Mono({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['300', '400', '500'],
+  weight: ['300', '400', '500', '600'],
   variable: '--font-mono',
 })
 
 export const metadata: Metadata = {
-  title: 'Otelie Studio — Design Concepts for Small Businesses',
-  description: 'Generate a complete design concept for your café, bistro or ice cream shop in minutes.',
+  title: 'Otelie — Design de Interiores',
+  description: 'Concept de design para o seu negócio em minutos.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmMono.variable} h-full`}>
-      <body className="min-h-full h-full antialiased">{children}</body>
+    <html lang="pt" className={`${nunito.variable} ${inter.variable} h-full`}>
+      <body className="min-h-full h-full antialiased">
+        {children}
+        <DebugPanel />
+      </body>
     </html>
   )
 }

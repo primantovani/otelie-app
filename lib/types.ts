@@ -188,3 +188,55 @@ export const PRIORIDADE_LABELS: Record<Prioridade, string> = {
   'moveis-decor': 'Furniture & decor',
   'iluminacao': 'Lighting focus',
 }
+
+// ─── Journey Stage 2 — Needs Assessment ──────────────────────────────────────
+
+export type TipoUso = 'cafeteria' | 'restaurante' | 'sorveteria' | 'bar'
+export type PerfilPublico = 'jovem-casual' | 'corporativo' | 'familia' | 'premium' | 'turista' | 'artistico'
+export type OrcamentoProjeto = 'ate50k' | '50k-150k' | '150k-300k' | 'acima300k'
+export type PrazoProjeto = 'urgente' | '1-3-meses' | '3-6-meses' | 'sem-prazo'
+
+// ─── Journey Stage 1.4 — Photo Analysis ──────────────────────────────────────
+
+export interface FotoAnalise {
+  pisoTipo?: PisoTipo
+  paredeTipo?: ParedeTipo
+  tetoTipo?: TetoTipo
+  estiloAtual: string
+  condicao: string
+  palavrasChave: string[]
+  observacoes: string
+}
+
+// ─── Journey Stage 3 — Concept Redesign™ output ──────────────────────────────
+
+export interface ConceptAtmosfera {
+  paleta: string[]        // hex codes
+  temperaturaLuz: string
+  materiais: string[]
+  descricao: string
+}
+export interface ConceptRitmoVisual {
+  descricao: string
+  circulacao: string
+  pontosFocais: string[]
+}
+export interface ConceptPresencaEmocional {
+  conceito: string
+  palavrasChave: string[]
+  storytelling: string
+}
+export interface ConceptSensory {
+  materiais: string[]
+  texturas: string[]
+  trilhaSonora: string
+  fragrancia: string
+  descricao: string
+}
+export interface ConceptRedesign {
+  atmosfera: ConceptAtmosfera
+  ritmoVisual: ConceptRitmoVisual
+  presencaEmocional: ConceptPresencaEmocional
+  redesignIA: { imagemUrl: string; prompt: string }
+  sensoryConcept: ConceptSensory
+}

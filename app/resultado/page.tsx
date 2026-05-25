@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import type { BriefResult, BriefFormData } from '@/lib/types'
 import { SPACE_LABELS } from '@/lib/types'
+import { pushDebugEntry } from '@/lib/debug-store'
 
 function ImagePlaceholder({ step, palette, elapsed, small }: {
   step: string
@@ -97,6 +98,7 @@ function ResultContent() {
       .then(async res => {
         const data = await res.json()
         stopTimer()
+        if (data._debug) pushDebugEntry(data._debug)
         if (!res.ok || data.error) {
           setImageError(data.error ?? 'Erro ao gerar imagem')
         } else {
@@ -121,6 +123,7 @@ function ResultContent() {
     })
       .then(async res => {
         const data = await res.json()
+        if (data._debug) pushDebugEntry(data._debug)
         if (!res.ok || data.error) setPlantaError(data.error ?? 'Erro ao gerar planta')
         else setPlantaUrl(data.url)
         setPlantaLoading(false)

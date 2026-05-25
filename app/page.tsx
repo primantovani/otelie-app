@@ -1,12 +1,25 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import dynamic from 'next/dynamic'
+import type { SpaceViewer3DProps } from '@/components/SpaceViewer3D'
+const SpaceViewer3D = dynamic(() => import('@/components/SpaceViewer3D'), { ssr: false })
+const BriefingDownloadButton = dynamic(() => import('@/components/BriefingDownloadButton'), { ssr: false })
+import { pushDebugEntry } from '@/lib/debug-store'
+import Logo from '@/components/Logo'
 import type {
   BriefFormData, PeDireito, AmbienteInterno,
   PlantaForma, JanelasPos, ElementoFixo, EntradaPos,
   PisoTipo, ParedeTipo, TetoTipo,
   JanelaCustom, PortaInterna, PilarCustom, MovelFixo, MovelTipo, PosicaoH, EscadaCustom,
+  FotoAnalise, ConceptRedesign,
+  TipoUso, PerfilPublico, OrcamentoProjeto, PrazoProjeto,
 } from '@/lib/types'
+import { t as tr, type Lang } from '@/lib/i18n'
+import type { BriefingSummaryData } from '@/components/BriefingSummaryPDF'
+
+
+// ─── local state types ────────────────────────────────────────────────────────
 
 type FormState = {
   area: number
@@ -30,7 +43,21 @@ type FormState = {
   tetoTipo: TetoTipo | ''
 }
 
-// ─── sub-components ───────────────────────────────────────────────────────────
+type NeedsState = {
+  tipoUso: TipoUso | ''
+  perfilPublico: PerfilPublico[]
+  capacidade: string
+  palavrasChave: string[]
+  restricoes: string
+  orcamento: OrcamentoProjeto | ''
+  prazo: PrazoProjeto | ''
+  referencias: string[]   // base64 dataURLs
+  nomeMarca: string
+  redeSocial: string
+  primeiraUnidade: 'sim' | 'nao' | ''
+}
+
+// ─── shared atoms ─────────────────────────────────────────────────────────────
 
 function OptGrid<T extends string>({
   options, value, onChange, cols = 2, aiFields, fieldKey,
@@ -49,10 +76,30 @@ function OptGrid<T extends string>({
           className={`opt-btn${value === val ? ' selected' : ''}`}>
           {label}
           {aiFields && fieldKey && aiFields.has(fieldKey) && value === val && (
-            <span className="ml-1.5 text-[8px] font-bold bg-[#6366f1]/15 text-[#6366f1] px-1 py-0.5 rounded">IA</span>
+            <span className="ml-1.5 text-[8px] font-bold bg-[#D1A23A]/15 text-[#D1A23A] px-1 py-0.5 rounded">IA</span>
           )}
         </button>
       ))}
+    </div>
+  )
+}
+
+function MultiSelect<T extends string>({ options, value, onChange, cols = 2 }: {
+  options: [T, string][]
+  value: T[]
+  onChange: (v: T[]) => void
+  cols?: number
+}) {
+  return (
+    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+      {options.map(([val, label]) => {
+        const on = value.includes(val)
+        return (
+          <button key={val} type="button"
+            onClick={() => onChange(on ? value.filter(x => x !== val) : [...value, val])}
+            className={`opt-btn${on ? ' selected' : ''}`}>{label}</button>
+        )
+      })}
     </div>
   )
 }
@@ -61,9 +108,7 @@ function Section({ visible, children }: { visible: boolean; children: React.Reac
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!visible) return
-    const el = ref.current
-    if (!el) return
-    const timer = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
+    const timer = setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
     return () => clearTimeout(timer)
   }, [visible])
   if (!visible) return null
@@ -71,207 +116,24 @@ function Section({ visible, children }: { visible: boolean; children: React.Reac
 }
 
 function AiBadge() {
-  return <span className="ml-2 text-[8px] font-bold bg-[#6366f1]/10 text-[#6366f1] px-1.5 py-0.5 rounded-full tracking-wide">IA</span>
+  return <span className="ml-2 text-[8px] font-bold bg-[#D1A23A]/10 text-[#D1A23A] px-1.5 py-0.5 rounded-full tracking-wide">IA</span>
 }
-
-const SECTION_LABEL = 'text-[10px] font-bold uppercase tracking-[0.15em] text-[#6366f1] mb-5'
-const SECTION_STYLE = { fontFamily: 'var(--font-mono, monospace)' }
-
-function ViewCard({ title, src, aspectClass = 'aspect-[4/3]' }: { title: string; src: string; aspectClass?: string }) {
-  const slug = title.toLowerCase().replace(/\s+/g, '-')
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between px-0.5">
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6b7280]">{title}</span>
-        <div className="flex items-center gap-4">
-          <a href={src} target="_blank" rel="noopener noreferrer"
-            className="text-[11px] font-medium text-[#6366f1] hover:underline">Ver</a>
-          <a href={src} download={`otelie-${slug}.png`}
-            className="text-[11px] font-medium text-[#6366f1] hover:underline">↓ Baixar</a>
-        </div>
-      </div>
-      <a href={src} target="_blank" rel="noopener noreferrer" className="block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={title}
-          className={`rounded-xl border border-[#e5e7eb] w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity ${aspectClass}`} />
-      </a>
-    </div>
-  )
-}
-
-// ── Floor plan SVG — generated from form data (browser-side, no SketchUp dependency) ──
-function FloorPlanSVG({ form }: { form: FormState }) {
-  const svgRef = useRef<SVGSVGElement>(null)
-
-  // form.comprimento / form.largura are in metres; form.area in sq m (auto-calc = comp×larg)
-  let wM: number, lM: number
-  if (form.comprimento && form.largura) {
-    wM = form.largura
-    lM = form.comprimento
-  } else {
-    const ratios: Record<string, number> = {
-      corredor: 0.30, quadrado: 1.00, retangular: 0.65, 'formato-l': 0.65, irregular: 0.72,
-    }
-    const r = ratios[form.plantaForma || 'retangular'] ?? 0.65
-    const sqM = form.area  // treat stored value as sq m for proportional display
-    lM = Math.sqrt(sqM / r)
-    wM = sqM / lM
-  }
-
-  const SIZE = 560
-  const MGEX = 76           // margin for dimension labels
-  const WALL_M = 0.15       // wall thickness in metres
-  const scale = (SIZE - 2 * MGEX) / Math.max(wM, lM)
-  const W  = wM * scale
-  const L  = lM * scale
-  const T  = Math.max(WALL_M * scale, 7)   // wall thickness in SVG px
-
-  // Centre room in canvas
-  const ox = MGEX + (SIZE - 2 * MGEX - W) / 2
-  const oy = MGEX + (SIZE - 2 * MGEX - L) / 2
-
-  const FLOOR_COLORS: Record<string, string> = {
-    'cimento-queimado': '#d2cfc8', 'ceramica': '#ece5d2', 'madeira': '#c8936a',
-    'vinilico': '#c0b8b0', 'pedra': '#b8b5ae', 'outro': '#d4d0c8',
-  }
-  const floorFill = FLOOR_COLORS[form.pisoTipo || ''] ?? '#dddbd4'
-  const WC = '#2a2a2a'   // wall colour
-  const DC = '#4b6bfb'   // dimension colour
-
-  const ep = form.entradaPos || 'frente'
-  const jp = form.janelasPos  || 'sem-janelas'
-  const dPx = (form.portaLargura ?? 0.9) * scale   // door width px
-  const dCX  = (W - dPx) / 2                        // door offset along H walls
-  const dCY  = (L - dPx) / 2                        // door offset along V walls
-  const winPx = W * 0.36
-  const wCX   = (W - winPx) / 2
-
-  const downloadSVG = () => {
-    if (!svgRef.current) return
-    const data = new XMLSerializer().serializeToString(svgRef.current)
-    const blob = new Blob([data], { type: 'image/svg+xml' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = 'planta-baixa.svg'; a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between px-0.5">
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6b7280]">Planta Baixa</span>
-        <button onClick={downloadSVG} className="text-[11px] font-medium text-[#6366f1] hover:underline">↓ Baixar SVG</button>
-      </div>
-      <svg ref={svgRef} width="100%" viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="rounded-xl border border-[#e5e7eb] bg-white w-full"
-        style={{ maxHeight: 560 }}>
-        <defs>
-          {/* Cross-hatch fill for cut walls */}
-          <pattern id="wp" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="5" stroke="#555" strokeWidth="1.5" />
-          </pattern>
-        </defs>
-
-        {/* Floor */}
-        <rect x={ox+T} y={oy+T} width={W-2*T} height={L-2*T} fill={floorFill} />
-
-        {/* Walls — hatched fill */}
-        <rect x={ox}      y={oy}      width={W} height={T}   fill="url(#wp)" />  {/* N */}
-        <rect x={ox}      y={oy+L-T}  width={W} height={T}   fill="url(#wp)" />  {/* S */}
-        <rect x={ox}      y={oy+T}    width={T} height={L-2*T} fill="url(#wp)" />{/* W */}
-        <rect x={ox+W-T}  y={oy+T}    width={T} height={L-2*T} fill="url(#wp)" />{/* E */}
-        {/* Corner fills */}
-        <rect x={ox}     y={oy}     width={T} height={T} fill="url(#wp)" />
-        <rect x={ox+W-T} y={oy}     width={T} height={T} fill="url(#wp)" />
-        <rect x={ox}     y={oy+L-T} width={T} height={T} fill="url(#wp)" />
-        <rect x={ox+W-T} y={oy+L-T} width={T} height={T} fill="url(#wp)" />
-        {/* Room outline */}
-        <rect x={ox} y={oy} width={W} height={L} fill="none" stroke={WC} strokeWidth="1.5" />
-
-        {/* ── Door ── */}
-        {ep === 'frente' && <>
-          <rect x={ox+dCX} y={oy+L-T-0.5} width={dPx} height={T+2} fill={floorFill} />
-          <line x1={ox+dCX} y1={oy+L-T} x2={ox+dCX} y2={oy+L-T-dPx} stroke={WC} strokeWidth="1.5" />
-          <path d={`M${ox+dCX} ${oy+L-T-dPx} A${dPx} ${dPx} 0 0 1 ${ox+dCX+dPx} ${oy+L-T}`}
-            fill="none" stroke={WC} strokeWidth="1" strokeDasharray="4,2" />
-        </>}
-        {ep === 'fundo' && <>
-          <rect x={ox+dCX} y={oy-0.5} width={dPx} height={T+1} fill={floorFill} />
-          <line x1={ox+dCX+dPx} y1={oy+T} x2={ox+dCX+dPx} y2={oy+T+dPx} stroke={WC} strokeWidth="1.5" />
-          <path d={`M${ox+dCX+dPx} ${oy+T+dPx} A${dPx} ${dPx} 0 0 0 ${ox+dCX} ${oy+T}`}
-            fill="none" stroke={WC} strokeWidth="1" strokeDasharray="4,2" />
-        </>}
-        {ep === 'lateral-esq' && <>
-          <rect x={ox-0.5} y={oy+dCY} width={T+1} height={dPx} fill={floorFill} />
-          <line x1={ox+T} y1={oy+dCY} x2={ox+T+dPx} y2={oy+dCY} stroke={WC} strokeWidth="1.5" />
-          <path d={`M${ox+T+dPx} ${oy+dCY} A${dPx} ${dPx} 0 0 0 ${ox+T} ${oy+dCY+dPx}`}
-            fill="none" stroke={WC} strokeWidth="1" strokeDasharray="4,2" />
-        </>}
-        {ep === 'lateral-dir' && <>
-          <rect x={ox+W-T-0.5} y={oy+dCY} width={T+1} height={dPx} fill={floorFill} />
-          <line x1={ox+W-T} y1={oy+dCY+dPx} x2={ox+W-T-dPx} y2={oy+dCY+dPx} stroke={WC} strokeWidth="1.5" />
-          <path d={`M${ox+W-T-dPx} ${oy+dCY+dPx} A${dPx} ${dPx} 0 0 0 ${ox+W-T} ${oy+dCY}`}
-            fill="none" stroke={WC} strokeWidth="1" strokeDasharray="4,2" />
-        </>}
-
-        {/* ── Window on S wall (frente) if no door there ── */}
-        {(jp === 'so-frente' || jp === 'frente-lateral') && ep !== 'frente' && <>
-          <rect x={ox+wCX} y={oy+L-T-0.5} width={winPx} height={T+1} fill="white" />
-          <line x1={ox+wCX} y1={oy+L-T+T*0.28} x2={ox+wCX+winPx} y2={oy+L-T+T*0.28} stroke="#888" strokeWidth="1.5" />
-          <line x1={ox+wCX} y1={oy+L-T*0.28} x2={ox+wCX+winPx} y2={oy+L-T*0.28} stroke="#888" strokeWidth="1.5" />
-          <line x1={ox+wCX}       y1={oy+L-T} x2={ox+wCX}       y2={oy+L} stroke={WC} strokeWidth="1" />
-          <line x1={ox+wCX+winPx} y1={oy+L-T} x2={ox+wCX+winPx} y2={oy+L} stroke={WC} strokeWidth="1" />
-        </>}
-        {/* Window on E wall */}
-        {(jp === 'frente-lateral' || jp === 'so-lateral') && ep !== 'lateral-dir' && <>
-          <rect x={ox+W-T-0.5} y={oy+(L-winPx)/2} width={T+1} height={winPx} fill="white" />
-          <line x1={ox+W-T+T*0.28} y1={oy+(L-winPx)/2} x2={ox+W-T+T*0.28} y2={oy+(L+winPx)/2} stroke="#888" strokeWidth="1.5" />
-          <line x1={ox+W-T*0.28}   y1={oy+(L-winPx)/2} x2={ox+W-T*0.28}   y2={oy+(L+winPx)/2} stroke="#888" strokeWidth="1.5" />
-        </>}
-
-        {/* ── Dimensions ── */}
-        {/* Width — below */}
-        <line x1={ox}   y1={oy+L+22} x2={ox+W} y2={oy+L+22} stroke={DC} strokeWidth="1" />
-        <line x1={ox}   y1={oy+L+17} x2={ox}   y2={oy+L+27} stroke={DC} strokeWidth="1" />
-        <line x1={ox+W} y1={oy+L+17} x2={ox+W} y2={oy+L+27} stroke={DC} strokeWidth="1" />
-        <text x={ox+W/2} y={oy+L+40} textAnchor="middle" fontSize="12" fill={DC}
-          fontFamily="monospace" fontWeight="600">{wM.toFixed(2)}m</text>
-
-        {/* Length — right */}
-        <line x1={ox+W+22} y1={oy}   x2={ox+W+22} y2={oy+L} stroke={DC} strokeWidth="1" />
-        <line x1={ox+W+17} y1={oy}   x2={ox+W+27} y2={oy}   stroke={DC} strokeWidth="1" />
-        <line x1={ox+W+17} y1={oy+L} x2={ox+W+27} y2={oy+L} stroke={DC} strokeWidth="1" />
-        <text x={ox+W+32} y={oy+L/2} textAnchor="start" fontSize="12" fill={DC}
-          fontFamily="monospace" fontWeight="600" dominantBaseline="middle">{lM.toFixed(2)}m</text>
-
-        {/* North arrow */}
-        <text x={ox+W+52} y={oy+12} textAnchor="middle" fontSize="9" fill="#9ca3af" fontWeight="700">N</text>
-        <path d={`M${ox+W+52} ${oy+16} L${ox+W+48} ${oy+30} L${ox+W+52} ${oy+25} L${ox+W+56} ${oy+30} Z`}
-          fill="#374151" />
-      </svg>
-    </div>
-  )
-}
-
-// ─── reusable mini-form atoms ─────────────────────────────────────────────────
 
 function NumInput({ placeholder, value, onChange }: { placeholder: string; value: string; onChange: (v: string) => void }) {
   return (
     <input type="number" placeholder={placeholder} value={value}
       onChange={e => onChange(e.target.value)} min="0.1" step="0.1"
-      className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 outline-none focus:border-[#6366f1]" />
+      className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 outline-none focus:border-[#D1A23A]" />
   )
 }
 
 function WallSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#6366f1]">
+      className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#D1A23A]">
       <option value="">Parede</option>
-      <option value="frente">Frente</option>
-      <option value="fundo">Fundo</option>
-      <option value="lateral-esq">Lateral esq.</option>
-      <option value="lateral-dir">Lateral dir.</option>
+      <option value="frente">Frente</option><option value="fundo">Fundo</option>
+      <option value="lateral-esq">Lateral esq.</option><option value="lateral-dir">Lateral dir.</option>
     </select>
   )
 }
@@ -279,7 +141,7 @@ function WallSelect({ value, onChange }: { value: string; onChange: (v: string) 
 function PosHSelect({ value, onChange }: { value: string; onChange: (v: PosicaoH) => void }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value as PosicaoH)}
-      className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#6366f1]">
+      className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#D1A23A]">
       <option value="esq">Lado esquerdo</option>
       <option value="centro">Centro</option>
       <option value="dir">Lado direito</option>
@@ -287,20 +149,9 @@ function PosHSelect({ value, onChange }: { value: string; onChange: (v: PosicaoH
   )
 }
 
-function MiniList<T>({
-  label, items, onRemove, renderChip,
-  adding, onAdd, onCancel, onCommit, addLabel, children,
-}: {
-  label: string
-  items: T[]
-  onRemove: (i: number) => void
-  renderChip: (item: T) => string
-  adding: boolean
-  onAdd: () => void
-  onCancel: () => void
-  onCommit: () => void
-  addLabel: string
-  children?: React.ReactNode
+function MiniList<T>({ label, items, onRemove, renderChip, adding, onAdd, onCancel, onCommit, addLabel, children }: {
+  label: string; items: T[]; onRemove: (i: number) => void; renderChip: (item: T) => string
+  adding: boolean; onAdd: () => void; onCancel: () => void; onCommit: () => void; addLabel: string; children?: React.ReactNode
 }) {
   return (
     <div>
@@ -308,10 +159,9 @@ function MiniList<T>({
       {items.length > 0 && (
         <div className="space-y-1.5 mb-2">
           {items.map((item, i) => (
-            <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm">
-              <span className="text-[#1f2937]">{renderChip(item)}</span>
-              <button type="button" onClick={() => onRemove(i)}
-                className="text-[#9ca3af] hover:text-red-400 ml-2 text-xs transition-colors">✕</button>
+            <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] text-sm">
+              <span className="text-[#1a1a1a]">{renderChip(item)}</span>
+              <button type="button" onClick={() => onRemove(i)} className="text-[#9ca3af] hover:text-red-400 ml-2 text-xs transition-colors">✕</button>
             </div>
           ))}
         </div>
@@ -320,19 +170,13 @@ function MiniList<T>({
         <div className="border border-[#e5e7eb] rounded-xl p-3 space-y-2">
           {children}
           <div className="flex gap-2">
-            <button type="button" onClick={onCommit}
-              className="flex-1 text-sm font-medium bg-[#6366f1] text-white rounded-lg px-3 py-2 hover:bg-[#4f46e5] transition-colors">
-              Adicionar
-            </button>
-            <button type="button" onClick={onCancel}
-              className="flex-1 text-sm text-[#6b7280] border border-[#e5e7eb] rounded-lg px-3 py-2 hover:bg-[#f3f4f6] transition-colors">
-              Cancelar
-            </button>
+            <button type="button" onClick={onCommit} className="flex-1 text-sm font-medium bg-[#D1A23A] text-white rounded-lg px-3 py-2 hover:bg-[#a07d2e] transition-colors">Adicionar</button>
+            <button type="button" onClick={onCancel} className="flex-1 text-sm text-[#6b7280] border border-[#e5e7eb] rounded-lg px-3 py-2 hover:bg-[#f3f4f6] transition-colors">Cancelar</button>
           </div>
         </div>
       ) : (
         <button type="button" onClick={onAdd}
-          className="w-full text-sm text-[#6366f1] border border-dashed border-[#6366f1]/40 rounded-xl px-3 py-2.5 hover:bg-[#6366f1]/[0.03] transition-colors">
+          className="w-full text-sm text-[#D1A23A] border border-dashed border-[#D1A23A]/40 rounded-xl px-3 py-2.5 hover:bg-[#D1A23A]/[0.03] transition-colors">
           {addLabel}
         </button>
       )}
@@ -340,725 +184,1166 @@ function MiniList<T>({
   )
 }
 
+// ─── stage navigation ─────────────────────────────────────────────────────────
+
+function StageNav({ stage, maxStage, onSelect, tx }: {
+  stage: 1 | 2 | 3
+  maxStage: number
+  onSelect: (n: 1 | 2 | 3) => void
+  tx: typeof tr[Lang]
+}) {
+  const stages = [
+    { n: 1 as const, short: tx.bfStep1 },
+    { n: 2 as const, short: tx.bfStep2 },
+    { n: 3 as const, short: tx.bfStep3 },
+  ]
+  // With 3 steps, circles sit at 1/6, 3/6, 5/6 of the container.
+  // Track runs between them: left=16.67%, right=16.67%.
+  // Progress fill grows from left=16.67% by up to 66.67% of container.
+  const progressPct = ((maxStage - 1) / (stages.length - 1)) * 100
+  const progressWidth = `${progressPct * (2 / 3)}%`
+
+  return (
+    <div className="relative mb-8" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>
+      {/* track */}
+      <div className="absolute h-px bg-[#e5e7eb]"
+        style={{ top: '0.875rem', left: 'calc(100% / 6)', right: 'calc(100% / 6)' }} />
+      {/* progress fill */}
+      <div className="absolute h-px bg-[#D1A23A] transition-all duration-300"
+        style={{ top: '0.875rem', left: 'calc(100% / 6)', width: progressWidth }} />
+      {/* steps — each takes exactly 1/3 so circles land at 1/6, 3/6, 5/6 */}
+      <div className="relative flex">
+        {stages.map(s => {
+          const done      = maxStage > s.n
+          const active    = stage === s.n
+          const reachable = maxStage >= s.n
+          return (
+            <button key={s.n}
+              onClick={() => reachable && onSelect(s.n)}
+              disabled={!reachable}
+              className="flex-1 flex flex-col items-center gap-1.5 transition-opacity"
+              style={{ opacity: reachable ? 1 : 0.35, cursor: reachable ? 'pointer' : 'default' }}
+            >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors"
+                style={{
+                  background: active ? '#D1A23A' : done ? '#1a1a1a' : '#f3f4f6',
+                  color: active ? '#fff' : done ? '#fff' : '#9ca3af',
+                  border: active ? '2px solid #D1A23A' : 'none',
+                }}>
+                {done ? '✓' : s.n}
+              </div>
+              <span className="text-[9px] font-medium uppercase tracking-wider hidden sm:block text-center"
+                style={{ color: active ? '#1a1a1a' : done ? '#D1A23A' : '#9ca3af' }}>
+                {s.short}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── concept display components ───────────────────────────────────────────────
+
+function ConceptCard({ num, title, children }: { num: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden">
+      <div className="px-7 pt-6 pb-2 border-b border-[#f3f4f6]">
+        <div className="flex items-baseline gap-3">
+          <span className="text-[2.5rem] font-bold leading-none select-none" style={{ color: '#f0f0ee', fontFamily: 'serif' }}>{num}</span>
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#D1A23A]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>Concept Redesign™</p>
+            <h2 className="text-base font-semibold text-[#1a1a1a]">{title}</h2>
+          </div>
+        </div>
+      </div>
+      <div className="px-7 py-6">{children}</div>
+    </div>
+  )
+}
+
+function Pill({ label }: { label: string }) {
+  return <span className="inline-block px-3 py-1 bg-[#f3f4f6] text-[#374151] text-[11px] font-medium rounded-full">{label}</span>
+}
+
+function ConceptDisplay({ concept, viewerProps, capturedViews, existente, necessidades }: {
+  concept: ConceptRedesign
+  viewerProps: SpaceViewer3DProps
+  capturedViews?: Record<string, string>
+  existente?: Record<string, unknown>
+  necessidades?: Record<string, unknown>
+}) {
+  const { atmosfera, ritmoVisual, presencaEmocional, redesignIA, sensoryConcept } = concept
+  const [genImages, setGenImages] = useState<Record<string, string>>({})
+  const [genEnhanced, setGenEnhanced] = useState<Record<string, string>>({})
+  const [genPrompts, setGenPrompts] = useState<Record<string, string>>({})
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  const hasViews = capturedViews && Object.keys(capturedViews).length > 0
+
+  async function gerarVisualizacoes() {
+    if (!hasViews) return
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const views = capturedViews
+      const res = await fetch('/api/concept-imagens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ views, concept, existente, necessidades }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setGenImages(data.images ?? {})
+      setGenEnhanced(data.enhancedImages ?? {})
+      setGenPrompts(data.prompts ?? {})
+      if (data.imageErrors && Object.keys(data.imageErrors).length > 0) {
+        const firstErr = Object.values(data.imageErrors as Record<string, string>)[0]
+        setGenError(`Imagem não gerada: ${firstErr}`)
+      }
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Erro ao gerar visualizações')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const VIEW_LABELS: Record<string, string> = { planta: 'Planta', fundo: 'Fundo', frente: 'Frente', dir: 'Dir.', esq: 'Esq.' }
+
+  return (
+    <div className="space-y-4">
+
+      {/* 01 Nova Atmosfera */}
+      <ConceptCard num="01" title="Nova Atmosfera">
+        <div className="space-y-5">
+          <div>
+            <p className="form-label mb-3">Paleta</p>
+            <div className="flex gap-2 flex-wrap">
+              {atmosfera.paleta.map((hex, i) => (
+                <div key={i} className="flex flex-col items-center gap-1.5">
+                  <div className="w-11 h-14 rounded-lg shadow-sm border border-black/5" style={{ background: hex }} />
+                  <span className="text-[9px] text-[#9ca3af] font-mono">{hex}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="form-label mb-1">Iluminação</p>
+            <p className="text-sm text-[#4b5563]">{atmosfera.temperaturaLuz}</p>
+          </div>
+          <div>
+            <p className="form-label mb-2">Materiais</p>
+            <div className="flex flex-wrap gap-2">{atmosfera.materiais.map((m, i) => <Pill key={i} label={m} />)}</div>
+          </div>
+          <p className="text-sm text-[#4b5563] leading-relaxed">{atmosfera.descricao}</p>
+        </div>
+      </ConceptCard>
+
+      {/* 02 Ritmo Visual */}
+      <ConceptCard num="02" title="Ritmo Visual">
+        <div className="space-y-5">
+          <SpaceViewer3D {...viewerProps} />
+          <p className="text-[10px] text-[#9ca3af] text-center">Arrastar → orbitar · scroll → zoom</p>
+          <p className="text-sm text-[#4b5563] leading-relaxed">{ritmoVisual.descricao}</p>
+          <div>
+            <p className="form-label mb-1">Circulação</p>
+            <p className="text-sm text-[#4b5563]">{ritmoVisual.circulacao}</p>
+          </div>
+          <div>
+            <p className="form-label mb-2">Pontos focais</p>
+            <ol className="space-y-1">
+              {ritmoVisual.pontosFocais.map((p, i) => (
+                <li key={i} className="flex gap-2 text-sm text-[#4b5563]">
+                  <span className="text-[#D1A23A] font-mono font-bold shrink-0">{i + 1}.</span>
+                  {p}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </ConceptCard>
+
+      {/* 03 Presença Emocional */}
+      <ConceptCard num="03" title="Presença Emocional">
+        <div className="space-y-5">
+          <blockquote className="border-l-2 border-[#D1A23A] pl-4 py-1">
+            <p className="text-base font-semibold text-[#1a1a1a] italic leading-snug">"{presencaEmocional.conceito}"</p>
+          </blockquote>
+          <div className="flex flex-wrap gap-2">{presencaEmocional.palavrasChave.map((k, i) => <Pill key={i} label={k} />)}</div>
+          <p className="text-sm text-[#4b5563] leading-relaxed">{presencaEmocional.storytelling}</p>
+        </div>
+      </ConceptCard>
+
+      {/* 04 Visualizações por Vista */}
+      <ConceptCard num="04" title="Visualizações do Espaço">
+        <div className="space-y-4">
+          <p className="text-xs text-[#6b7280] leading-relaxed">
+            Claude lê cada render 3D e aplica o conceito Otelie mantendo a mesma câmera e proporções — exibição antes / depois por vista.
+          </p>
+
+          {/* generated images grid — render 3D antes / conceito depois */}
+          {Object.keys(genImages).length > 0 && (
+            <div className="space-y-4">
+              {(['planta', 'fundo', 'frente', 'dir', 'esq'] as const).map(id =>
+                genImages[id] ? (
+                  <div key={id} className="space-y-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>{VIEW_LABELS[id]} — Antes / Depois</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Antes: espaço vazio fotorrealista (fase 1), fallback para render 3D */}
+                      {(genEnhanced[id] || capturedViews?.[id]) && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={genEnhanced[id] ?? `data:image/jpeg;base64,${capturedViews![id]}`}
+                          alt={`Antes ${id}`}
+                          className="w-full rounded-xl border border-[#e5e7eb] object-cover"
+                          style={{ aspectRatio: '1/1' }}
+                        />
+                      )}
+                      {/* Depois: conceito aplicado (fase 2) */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={genImages[id]} alt={`Conceito ${id}`}
+                        className="w-full rounded-xl border border-[#e5e7eb] object-cover" style={{ aspectRatio: '1/1' }} />
+                    </div>
+                  </div>
+                ) : null
+              )}
+            </div>
+          )}
+
+          {/* prompts only (no images) */}
+          {Object.keys(genImages).length === 0 && Object.keys(genPrompts).length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-amber-600">Imagens não geradas — prompts prontos para uso em DALL-E 3 ou Midjourney:</p>
+              {Object.entries(genPrompts).map(([id, prompt]) => (
+                <div key={id} className="rounded-lg bg-[#f8f9fb] border border-[#e5e7eb] p-3 space-y-1">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>{id}</p>
+                  <p className="text-[11px] text-[#4b5563] leading-relaxed">{prompt}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {genError && <p className="text-xs text-red-500">{genError}</p>}
+
+          <button
+            onClick={gerarVisualizacoes}
+            disabled={generating || !hasViews}
+            className="w-full py-3 rounded-xl border border-[#D1A23A] text-[#D1A23A] text-sm font-medium transition-colors hover:bg-[#D1A23A]/5 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {generating
+              ? <><span className="animate-spin">⟳</span> Analisando cenas e gerando visualizações…</>
+              : Object.keys(genImages).length > 0 ? 'Regenerar visualizações' : 'Gerar visualizações do espaço'
+            }
+          </button>
+
+          {redesignIA.imagemUrl && Object.keys(genImages).length === 0 && (
+            <div className="space-y-2 pt-2 border-t border-[#f3f4f6]">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>Concept visual geral</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={redesignIA.imagemUrl} alt="Concept visual"
+                className="w-full rounded-xl border border-[#e5e7eb] object-cover" style={{ aspectRatio: '1/1' }} />
+            </div>
+          )}
+        </div>
+      </ConceptCard>
+
+      {/* 05 Sensory Concept */}
+      <ConceptCard num="05" title="Sensory Concept">
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="form-label mb-2">Materiais</p>
+              <div className="space-y-1">{sensoryConcept.materiais.map((m, i) => (
+                <p key={i} className="text-sm text-[#4b5563] flex gap-2"><span className="text-[#D1A23A]">—</span>{m}</p>
+              ))}</div>
+            </div>
+            <div>
+              <p className="form-label mb-2">Texturas</p>
+              <div className="space-y-1">{sensoryConcept.texturas.map((t, i) => (
+                <p key={i} className="text-sm text-[#4b5563] flex gap-2"><span className="text-[#D1A23A]">—</span>{t}</p>
+              ))}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-6 pt-2 border-t border-[#f3f4f6]">
+            <div>
+              <p className="form-label mb-1">Trilha sonora</p>
+              <p className="text-sm text-[#4b5563]">{sensoryConcept.trilhaSonora}</p>
+            </div>
+            <div>
+              <p className="form-label mb-1">Fragrância</p>
+              <p className="text-sm text-[#4b5563]">{sensoryConcept.fragrancia}</p>
+            </div>
+          </div>
+          <p className="text-sm text-[#4b5563] leading-relaxed">{sensoryConcept.descricao}</p>
+        </div>
+      </ConceptCard>
+
+    </div>
+  )
+}
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const SL = 'text-[10px] font-bold uppercase tracking-[0.15em] text-[#D1A23A] mb-5'
+const SS = { fontFamily: 'var(--font-mono, monospace)' }
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const [step, setStep] = useState<'upload' | 'form'>('upload')
 
-  // sketch upload
-  const [sketchBase64, setSketchBase64] = useState<string | null>(null)
-  const [sketchMime, setSketchMime] = useState<string>('image/jpeg')
+  // ── stage ─────────────────────────────────────────────────────────────────
+
+  const [lang, setLang] = useState<Lang>('pt')
+  const tx = tr[lang]
+
+  const [stage,      setStage]      = useState<1 | 2 | 3>(1)
+  const [maxStage,   setMaxStage]   = useState<number>(1)
+
+  function goToStage(n: 1 | 2 | 3) {
+    setStage(n)
+    if (n > maxStage) setMaxStage(n)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // ── stage 1 — existing form ───────────────────────────────────────────────
+
+  const [sketchBase64,  setSketchBase64]  = useState<string | null>(null)
+  const [sketchMime,    setSketchMime]    = useState<string>('image/jpeg')
   const [sketchPreview, setSketchPreview] = useState<string | null>(null)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
-  const [aiFields, setAiFields] = useState<Set<string>>(new Set())
+  const [analyzing,     setAnalyzing]     = useState(false)
+  const [analyzeError,  setAnalyzeError]  = useState<string | null>(null)
+  const [aiFields,      setAiFields]      = useState<Set<string>>(new Set())
 
-  // 3d model
-  const [modelLoading, setModelLoading] = useState(false)
-  const [modelError, setModelError] = useState<string | null>(null)
-  const [modelImages, setModelImages] = useState<{ perspective: string; topDown: string; planta: string | null } | null>(null)
-
-  // section visibility
-  const [showAberturas, setShowAberturas] = useState(false)
+  const [capturedViews, setCapturedViews] = useState<Record<string, string>>({})
+  const [showFotos,       setShowFotos]       = useState(false)
   const [showAcabamentos, setShowAcabamentos] = useState(false)
+  const [showCroquiHint,  setShowCroquiHint]  = useState(false)
 
-  // manual add-room mini-form
-  const [addingRoom, setAddingRoom] = useState(false)
-  const [newRoomNome, setNewRoomNome] = useState('')
-  const [newRoomPos, setNewRoomPos] = useState<AmbienteInterno['posicao'] | ''>('')
-  const [newRoomLarg, setNewRoomLarg] = useState('')
-  const [newRoomProf, setNewRoomProf] = useState('')
+  // unit conversion helpers (EN = imperial, PT = metric)
+  const FT_PER_M   = 3.28084
+  const SQFT_PER_M2 = 10.7639
+  const toM  = (ft: number) => ft / FT_PER_M
+  const toFt = (m: number)  => m  * FT_PER_M
+  const dimUnit  = lang === 'en' ? 'ft'    : 'm'
+  const areaUnit = lang === 'en' ? 'sq ft' : 'm²'
+  const displayDim = (m: number | undefined) => m == null ? '' : lang === 'en' ? parseFloat(toFt(m).toFixed(1)).toString() : m.toString()
+  // peDirLabel uses stored meters for threshold checks regardless of display unit
+  const peDirLabel = (storedM: number) => storedM < 2.4 ? tx.bfPeBaixo : storedM <= 3.35 ? tx.bfPeMedio : tx.bfPeAlto
 
-  function commitRoom() {
-    if (!newRoomNome.trim() || !newRoomPos) return
-    const room: AmbienteInterno = {
-      nome: newRoomNome.trim(),
-      posicao: newRoomPos,
-      largura: newRoomLarg ? parseFloat(newRoomLarg) : null,
-      profundidade: newRoomProf ? parseFloat(newRoomProf) : null,
-    }
-    setForm(f => ({ ...f, ambientesInternos: [...f.ambientesInternos, room] }))
-    setNewRoomNome(''); setNewRoomPos(''); setNewRoomLarg(''); setNewRoomProf('')
-    setAddingRoom(false)
-  }
-
-  // Janela custom mini-form
-  const [addingJanela, setAddingJanela] = useState(false)
-  const [newJanela, setNewJanela] = useState({ parede: '' as EntradaPos | '', posH: 'centro' as PosicaoH, largura: '1.2', altura: '1.2', peitoril: '0.9' })
-  function commitJanela() {
-    if (!newJanela.parede || !newJanela.largura || !newJanela.altura) return
-    const j: JanelaCustom = { parede: newJanela.parede as EntradaPos, posicaoH: newJanela.posH, largura: parseFloat(newJanela.largura), altura: parseFloat(newJanela.altura), peitoril: newJanela.peitoril ? parseFloat(newJanela.peitoril) : 0.9 }
-    setForm(f => ({ ...f, janelasCustom: [...f.janelasCustom, j] }))
-    setNewJanela({ parede: '', posH: 'centro', largura: '1.2', altura: '1.2', peitoril: '0.9' })
-    setAddingJanela(false)
-  }
-
-  // Porta interna mini-form
-  const [addingPorta, setAddingPorta] = useState(false)
-  const [newPorta, setNewPorta] = useState({ parede: '' as EntradaPos | '', posH: 'centro' as PosicaoH, largura: '0.9' })
-  function commitPorta() {
-    if (!newPorta.parede || !newPorta.largura) return
-    const p: PortaInterna = { parede: newPorta.parede as EntradaPos, posicaoH: newPorta.posH, largura: parseFloat(newPorta.largura) }
-    setForm(f => ({ ...f, portasInternas: [...f.portasInternas, p] }))
-    setNewPorta({ parede: '', posH: 'centro', largura: '0.9' })
-    setAddingPorta(false)
-  }
-
-  // Pilar custom mini-form
-  const [addingPilar, setAddingPilar] = useState(false)
-  const [newPilar, setNewPilar] = useState({ posX: '', posY: '', diametro: '0.2' })
-  function commitPilar() {
-    if (!newPilar.posX || !newPilar.posY) return
-    const p: PilarCustom = { posX: parseFloat(newPilar.posX), posY: parseFloat(newPilar.posY), diametro: parseFloat(newPilar.diametro || '0.2') }
-    setForm(f => ({ ...f, pilaresCustom: [...f.pilaresCustom, p] }))
-    setNewPilar({ posX: '', posY: '', diametro: '0.2' })
-    setAddingPilar(false)
-  }
-
-  // Móvel fixo mini-form
-  const [addingMovel, setAddingMovel] = useState(false)
-  const [newMovel, setNewMovel] = useState({ tipo: 'bancada' as MovelTipo, parede: '' as EntradaPos | 'centro' | '', posH: 'centro' as PosicaoH, largura: '', profundidade: '0.6', altura: '0.9' })
-  function commitMovel() {
-    if (!newMovel.parede || !newMovel.largura) return
-    const m: MovelFixo = { tipo: newMovel.tipo, parede: newMovel.parede as EntradaPos | 'centro', posicaoH: newMovel.posH, largura: parseFloat(newMovel.largura), profundidade: parseFloat(newMovel.profundidade || '0.6'), altura: parseFloat(newMovel.altura || '0.9') }
-    setForm(f => ({ ...f, moveisFixos: [...f.moveisFixos, m] }))
-    setNewMovel({ tipo: 'bancada', parede: '', posH: 'centro', largura: '', profundidade: '0.6', altura: '0.9' })
-    setAddingMovel(false)
-  }
-
-  // Escada custom mini-form
-  const [addingEscada, setAddingEscada] = useState(false)
-  const [newEscada, setNewEscada] = useState({ parede: '' as EntradaPos | '', posH: 'esq' as PosicaoH, largura: '0.9' })
-  function commitEscada() {
-    if (!newEscada.parede) return
-    const e: EscadaCustom = { parede: newEscada.parede as EntradaPos, posicaoH: newEscada.posH, largura: parseFloat(newEscada.largura || '0.9') }
-    setForm(f => ({ ...f, escadasCustom: [...f.escadasCustom, e] }))
-    setNewEscada({ parede: '', posH: 'esq', largura: '0.9' })
-    setAddingEscada(false)
-  }
 
   const [form, setForm] = useState<FormState>({
-    area: 40,
-    comprimento: undefined, largura: undefined, alturaPeDireito: undefined,
-    peDireito: '',
-    entradaPos: '', portaLargura: undefined,
+    area: 40, comprimento: undefined, largura: undefined, alturaPeDireito: undefined,
+    peDireito: '', entradaPos: '', portaLargura: undefined,
     plantaForma: '', janelasPos: '', elementosFixos: [], ambientesInternos: [],
     janelasCustom: [], portasInternas: [], pilaresCustom: [], moveisFixos: [], escadasCustom: [],
     pisoTipo: '', paredeTipo: '', tetoTipo: '',
   })
 
-  function set<K extends keyof FormState>(key: K, val: FormState[K]) {
-    setForm(f => ({ ...f, [key]: val }))
-  }
+  function set<K extends keyof FormState>(key: K, val: FormState[K]) { setForm(f => ({ ...f, [key]: val })) }
 
-  function toggleElemento(val: ElementoFixo) {
-    setForm(f => ({
-      ...f,
-      elementosFixos: f.elementosFixos.includes(val)
-        ? f.elementosFixos.filter(e => e !== val)
-        : [...f.elementosFixos, val],
-    }))
-  }
+  const displayArea = lang === 'en' ? Math.round(form.area * SQFT_PER_M2) : form.area
 
-  // Always metric — convert to feet for API
-  function toApiForm(): BriefFormData {
-    return {
-      ...(form as unknown as BriefFormData),
-      comprimento: form.comprimento != null ? form.comprimento * 3.281 : undefined,
-      largura: form.largura != null ? form.largura * 3.281 : undefined,
-      alturaPeDireito: form.alturaPeDireito != null ? form.alturaPeDireito * 3.281 : undefined,
-      area: Math.round(form.area * 10.764),
-    }
-  }
+  // progressive disclosure (fotosCat effect is declared after fotosCat below)
+  useEffect(() => { if (form.alturaPeDireito) setShowFotos(true) }, [form.alturaPeDireito])
+  useEffect(() => { if (form.alturaPeDireito) { const h = form.alturaPeDireito; set('peDireito', h < 2.4 ? 'baixo' : h <= 3.35 ? 'medio' : 'alto') } }, [form.alturaPeDireito])
+  useEffect(() => { if (form.comprimento && form.largura) set('area', Math.min(280, Math.max(15, Math.round(form.comprimento * form.largura / 5) * 5))) }, [form.comprimento, form.largura])
 
-  // ── upload handlers ───────────────────────────────────────────────────────
-
+  // croqui upload
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     setAnalyzeError(null)
     const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      setSketchPreview(dataUrl)
-      setSketchBase64(dataUrl.split(',')[1])
-      setSketchMime(file.type || 'image/jpeg')
-    }
+    reader.onload = () => { const d = reader.result as string; setSketchPreview(d); setSketchBase64(d.split(',')[1]); setSketchMime(file.type || 'image/jpeg') }
     reader.readAsDataURL(file)
   }
-
   async function analyzeSketch() {
     if (!sketchBase64) return
-    setAnalyzing(true)
-    setAnalyzeError(null)
+    setAnalyzing(true); setAnalyzeError(null)
     try {
-      const res = await fetch('/api/analisar-croqui', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: sketchBase64, mimeType: sketchMime }),
-      })
+      const res = await fetch('/api/analisar-croqui', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64: sketchBase64, mimeType: sketchMime }) })
       const data = await res.json()
+      if (data._debug) pushDebugEntry(data._debug)
       if (!res.ok) throw new Error(data.error ?? 'Erro')
-
-      const filled = new Set<string>()
-      const updates: Partial<FormState> = {}
-
+      const filled = new Set<string>(); const updates: Partial<FormState> = {}
       if (data.plantaForma)  { updates.plantaForma = data.plantaForma;   filled.add('plantaForma') }
       if (data.entradaPos)   { updates.entradaPos  = data.entradaPos;    filled.add('entradaPos') }
       if (data.portaLargura) { updates.portaLargura = data.portaLargura }
       if (data.janelasPos)   { updates.janelasPos  = data.janelasPos;    filled.add('janelasPos') }
-      if (Array.isArray(data.elementosFixos) && data.elementosFixos.length) {
-        updates.elementosFixos = data.elementosFixos; filled.add('elementosFixos')
-      }
+      if (Array.isArray(data.elementosFixos) && data.elementosFixos.length) { updates.elementosFixos = data.elementosFixos; filled.add('elementosFixos') }
       if (data.comprimento)  { updates.comprimento = data.comprimento;   filled.add('comprimento') }
       if (data.largura)      { updates.largura     = data.largura;       filled.add('largura') }
-      if (data.area) {
-        updates.area = Math.min(280, Math.max(15, Math.round(data.area / 5) * 5))
-        filled.add('area')
-      }
+      if (data.area)         { updates.area = Math.min(280, Math.max(15, Math.round(data.area / 5) * 5)); filled.add('area') }
       if (data.peDireito)       { updates.peDireito       = data.peDireito;       filled.add('peDireito') }
       if (data.alturaPeDireito) { updates.alturaPeDireito = data.alturaPeDireito; filled.add('alturaPeDireito') }
-
-
-      setForm(f => ({ ...f, ...updates }))
-      setAiFields(filled)
-      setStep('form')
-    } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : 'Não foi possível ler o croqui. Tente uma imagem mais clara ou preencha manualmente.')
-    } finally {
-      setAnalyzing(false)
-    }
+      if (Array.isArray(data.ambientesInternos) && data.ambientesInternos.length) {
+        updates.ambientesInternos = data.ambientesInternos
+        filled.add('ambientesInternos')
+      }
+      setForm(f => ({ ...f, ...updates })); setAiFields(filled)
+    } catch (err) { setAnalyzeError(err instanceof Error ? err.message : 'Não foi possível ler o croqui.') }
+    finally { setAnalyzing(false) }
   }
 
-  function resetSketch() {
-    setSketchBase64(null)
-    setSketchPreview(null)
-    setAiFields(new Set())
-    setAnalyzeError(null)
-    setStep('upload')
+  // stage 1.4 — space photos (categorized)
+  const FOTO_CATS = [
+    { id: 'fachada',    label: tx.bfFotoFachada,    req: true  },
+    { id: 'int_fundo',  label: tx.bfFotoIntFundo,   req: true  },
+    { id: 'int_frente', label: tx.bfFotoIntFrente,  req: true  },
+    { id: 'lat_esq',    label: tx.bfFotoLatEsq,     req: false },
+    { id: 'lat_dir',    label: tx.bfFotoLatDir,     req: false },
+    { id: 'detalhes',   label: tx.bfFotoDetalhes,   req: false },
+  ]
+
+  const [fotosCat,      setFotosCat]      = useState<Record<string, string>>({})   // id → base64
+  const [fotosPreview,  setFotosPreview]  = useState<Record<string, string>>({})   // id → dataURL
+  const [fotoAnalise,   setFotoAnalise]   = useState<FotoAnalise | null>(null)
+
+  // show acabamentos after first foto is uploaded
+  useEffect(() => { if (Object.keys(fotosCat).length > 0) setShowAcabamentos(true) }, [fotosCat])
+
+  function handleFotoChange(catId: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const d = reader.result as string
+      setFotosPreview(p => ({ ...p, [catId]: d }))
+      setFotosCat(p => ({ ...p, [catId]: d.split(',')[1] }))
+      setFotoAnalise(null)
+    }
+    reader.readAsDataURL(file)
   }
 
-  // ── progressive disclosure ────────────────────────────────────────────────
+  function removeFoto(catId: string) {
+    setFotosPreview(p => { const n = { ...p }; delete n[catId]; return n })
+    setFotosCat(p => { const n = { ...p }; delete n[catId]; return n })
+    setFotoAnalise(null)
+  }
 
-  useEffect(() => {
-    if (form.plantaForma || form.peDireito || form.alturaPeDireito) setShowAberturas(true)
-  }, [form.plantaForma, form.peDireito, form.alturaPeDireito])
+  const fotosObrigatorias = FOTO_CATS.filter(c => c.req).map(c => c.id)
+  const fotosCompletas = fotosObrigatorias.every(id => fotosCat[id])
 
-  useEffect(() => {
-    if (form.entradaPos) setShowAcabamentos(true)
-  }, [form.entradaPos])
 
-  // auto-set peDireito from numeric height
-  useEffect(() => {
-    if (form.alturaPeDireito) {
-      const h = form.alturaPeDireito
-      set('peDireito', h < 2.4 ? 'baixo' : h <= 3.35 ? 'medio' : 'alto')
-    }
-  }, [form.alturaPeDireito])
+  // ── stage 2 — needs ───────────────────────────────────────────────────────
 
-  // auto-calc area from dimensions
-  useEffect(() => {
-    if (form.comprimento && form.largura) {
-      set('area', Math.min(280, Math.max(15, Math.round(form.comprimento * form.largura / 5) * 5)))
-    }
-  }, [form.comprimento, form.largura])
+  const [needs, setNeeds] = useState<NeedsState>({
+    tipoUso: '', perfilPublico: [], capacidade: '',
+    palavrasChave: [], restricoes: '', orcamento: '', prazo: '', referencias: [],
+    nomeMarca: '', redeSocial: '', primeiraUnidade: '',
+  })
+  function setN<K extends keyof NeedsState>(key: K, val: NeedsState[K]) { setNeeds(n => ({ ...n, [key]: val })) }
 
-  // ── model ─────────────────────────────────────────────────────────────────
+  const [kwInput, setKwInput] = useState('')
 
-  async function handleGerarModelo() {
-    setModelLoading(true)
-    setModelError(null)
-    setModelImages(null)
+  function addKw() {
+    const kw = kwInput.trim(); if (!kw) return
+    if (!needs.palavrasChave.includes(kw)) setN('palavrasChave', [...needs.palavrasChave, kw])
+    setKwInput('')
+  }
+
+  function handleRefChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => { const d = reader.result as string; setN('referencias', [...needs.referencias, d]) }
+    reader.readAsDataURL(file)
+  }
+
+  // ── stage 3 — concept ─────────────────────────────────────────────────────
+
+  const [concept,       setConcept]       = useState<ConceptRedesign | null>(null)
+  const [gerandoConcept, setGerandoConcept] = useState(false)
+  const [conceptError,  setConceptError]  = useState<string | null>(null)
+  const [elapsed,       setElapsed]       = useState(0)
+
+  // hybrid workflow — project submission
+  const [projetoId,          setProjetoId]          = useState<string | null>(null)
+  const [solicitandoProjeto, setSolicitandoProjeto] = useState(false)
+  const [solicitacaoErro,    setSolicitacaoErro]    = useState<string | null>(null)
+
+  async function solicitarProjeto() {
+    setSolicitandoProjeto(true)
+    setSolicitacaoErro(null)
+    setConcept(null)
+    goToStage(3)
     try {
-      const res = await fetch('/api/modelo3d', {
+      const res = await fetch('/api/solicitar-projeto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(toApiForm()),
+        body: JSON.stringify({
+          existente:       form,
+          necessidades:    needs,
+          fotosCategories: Object.keys(fotosCat),
+          fotosBase64:     fotosCat,
+          views:           capturedViews.fundo ? { fundo: capturedViews.fundo } : {},
+        }),
       })
       const data = await res.json()
-      if (!res.ok || data.error) {
-        setModelError(data.error ?? 'Erro ao gerar modelo 3D')
-      } else {
-        setModelImages({ perspective: data.perspective, topDown: data.topDown, planta: data.planta ?? null })
-      }
+      if (!res.ok) throw new Error(data.error ?? 'Erro')
+      setProjetoId(data.id)
     } catch (err) {
-      setModelError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setSolicitacaoErro(err instanceof Error ? err.message : 'Erro ao solicitar projeto')
     } finally {
-      setModelLoading(false)
+      setSolicitandoProjeto(false)
     }
   }
 
-  const inputCls = 'w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3.5 text-[0.9375rem] text-[#1f2937] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#6366f1]'
-
-  // ── header ────────────────────────────────────────────────────────────────
-
-  const Header = (
-    <div className="mb-10 text-center">
-      <p className="text-[10px] font-bold tracking-[0.25em] text-[#9ca3af] uppercase mb-5">Gerador de modelo 3D</p>
-      <h1 className="text-[2rem] font-bold text-[#1f2937] leading-tight">
-        Otelie
-      </h1>
-      <p className="mt-4 text-[#9ca3af] text-base">Faça upload do croqui e gere o modelo 3D do seu espaço</p>
-    </div>
-  )
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP: UPLOAD
-  // ─────────────────────────────────────────────────────────────────────────
-
-  if (step === 'upload') {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
-        <div className="w-full max-w-xl">
-          {Header}
-
-          <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden">
-            <div className="px-8 pt-8 pb-7">
-              <p className={SECTION_LABEL} style={SECTION_STYLE}>Croqui de planta</p>
-
-              <label className={`block border-2 border-dashed rounded-xl cursor-pointer transition-colors ${sketchPreview ? 'border-[#6366f1]/30 bg-[#6366f1]/[0.02]' : 'border-[#e5e7eb] hover:border-[#6366f1]/30'}`}>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                {sketchPreview ? (
-                  <div className="p-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={sketchPreview} alt="sketch" className="max-h-64 mx-auto rounded-lg object-contain" />
-                    <p className="text-center text-xs text-[#6366f1] mt-3 font-medium">
-                      Croqui carregado — clique para trocar
-                    </p>
-                  </div>
-                ) : (
-                  <div className="px-8 py-12 text-center">
-                    <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#f3f4f6] flex items-center justify-center">
-                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M10 3v10M6 7l4-4 4 4" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <p className="text-sm text-[#6b7280] font-medium">Arraste ou clique — foto, scan ou arquivo digital</p>
-                    <p className="text-xs text-[#9ca3af] mt-1">JPG · PNG · desenhado à mão, impresso ou digital</p>
-                  </div>
-                )}
-              </label>
-
-              {analyzeError && (
-                <p className="mt-3 text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{analyzeError}</p>
-              )}
-
-              <button
-                type="button"
-                onClick={analyzeSketch}
-                disabled={!sketchBase64 || analyzing}
-                className="w-full mt-4 py-3.5 rounded-xl bg-[#6366f1] text-white font-semibold text-sm hover:bg-[#4f46e5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {analyzing ? 'Analisando planta…' : 'Analisar croqui'}
-              </button>
-
-              <p className="text-center mt-4">
-                <button type="button" onClick={() => setStep('form')}
-                  className="text-sm text-[#9ca3af] hover:text-[#6b7280] underline underline-offset-2 transition-colors">
-                  Preencher manualmente
-                </button>
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-6 text-center text-sm text-[#9ca3af]">Otelie · gerador de ambientes</p>
-        </div>
-      </main>
-    )
+  async function gerarConcept() {
+    setGerandoConcept(true); setConceptError(null); setConcept(null)
+    goToStage(3)
+    let t = 0
+    const timer = setInterval(() => { t += 1; setElapsed(t) }, 1000)
+    try {
+      const res = await fetch('/api/concept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ existente: form, necessidades: needs, fotoAnalise }),
+      })
+      const data = await res.json()
+      if (data._debug) pushDebugEntry(data._debug)
+      if (!res.ok) throw new Error(data.error ?? 'Erro')
+      setConcept(data.concept)
+    } catch (err) { setConceptError(err instanceof Error ? err.message : 'Erro ao gerar concept') }
+    finally { clearInterval(timer); setGerandoConcept(false) }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP: FORM
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── viewer props ──────────────────────────────────────────────────────────
+
+  const viewerProps = {
+    comprimento: form.comprimento,
+    largura: form.largura,
+    area: form.area,
+    alturaPeDireito: form.alturaPeDireito,
+    peDireito: (form.peDireito || 'medio') as PeDireito,
+    plantaForma: form.plantaForma || 'retangular',
+    janelasPos: 'sem-janelas',
+    entradaPos: form.entradaPos || 'frente',
+    fachada: '',
+    elementosFixos: form.elementosFixos,
+    pisoTipo: form.pisoTipo || '',
+    paredeTipo: form.paredeTipo || '',
+    tetoTipo: form.tetoTipo || '',
+    ambientesInternos: form.ambientesInternos,
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
-      <div className="w-full max-w-xl">
-        {Header}
+    <main className="min-h-screen" style={{ background: '#f8f9fb' }}>
+      <div className="max-w-xl mx-auto px-4 pt-10 pb-20">
 
-        <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden space-y-0">
+        {/* header */}
+        <div className="relative flex flex-col items-center mb-8">
+          <Logo variant="stacked" size="md" />
+          <button
+            onClick={() => setLang(l => l === 'pt' ? 'en' : 'pt')}
+            className="absolute right-0 top-0 text-[10px] font-bold tracking-widest text-[#6b7280] hover:text-[#D1A23A] border border-[#e5e7eb] hover:border-[#D1A23A] rounded-lg px-2.5 py-1.5 transition-colors"
+            style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}
+          >
+            {tx.bfLangToggle}
+          </button>
+        </div>
 
-          {/* Sketch thumbnail */}
-          {sketchPreview && (
-            <div className="px-8 pt-6 pb-0">
-              <div className="flex items-center gap-3 p-3 bg-[#f8f9fb] rounded-xl border border-[#e5e7eb]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={sketchPreview} alt="croqui" className="w-14 h-14 rounded-lg object-cover border border-[#e5e7eb] shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-[#1f2937]">Croqui carregado</p>
-                  <p className="text-[11px] text-[#9ca3af] mt-0.5 leading-snug">Campos espaciais preenchidos — revise e ajuste</p>
-                </div>
-                <button type="button" onClick={resetSketch}
-                  className="text-xs text-[#9ca3af] hover:text-[#6b7280] shrink-0 transition-colors">
-                  Trocar
-                </button>
-              </div>
-            </div>
-          )}
+        {/* stage nav */}
+        <StageNav stage={stage} maxStage={maxStage} onSelect={goToStage} tx={tx} />
 
-          {/* Bloco 1 — Planta */}
-          <div className="px-8 pt-8 pb-7">
-            <p className={SECTION_LABEL} style={SECTION_STYLE}>
-              Planta
-              {(aiFields.has('plantaForma') || aiFields.has('comprimento') || aiFields.has('area') || aiFields.has('peDireito')) && <AiBadge />}
-            </p>
-            <div className="space-y-6">
+        {/* ───────────────────────────────────────────────── STAGE 1 */}
+        {stage === 1 && (
+          <div className="space-y-0">
 
-              <div>
-                <label className="form-label">Formato da planta</label>
-                <div className="flex flex-col gap-2">
-                  {([
-                    ['corredor', 'Corredor'],['retangular', 'Retangular'],
-                    ['quadrado', 'Quadrado'],['formato-l', 'Formato L'],['irregular', 'Irregular'],
-                  ] as [PlantaForma, string][]).map(([val, label]) => (
-                    <button key={val} type="button" onClick={() => set('plantaForma', val)}
-                      className={`opt-btn${form.plantaForma === val ? ' selected' : ''}`}>
-                      {label}
-                      {aiFields.has('plantaForma') && form.plantaForma === val && <span className="ml-1.5 text-[8px] font-bold bg-[#6366f1]/15 text-[#6366f1] px-1 py-0.5 rounded">IA</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {/* ── Levantamento do espaço ──────────────────────── */}
+            <>
+                <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden space-y-0">
 
-              <div>
-                <label className="form-label">
-                  Dimensões <span className="text-[#9ca3af] font-normal normal-case tracking-normal">(opcional)</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {([
-                    { key: 'comprimento' as const, label: 'Comprimento' },
-                    { key: 'largura' as const, label: 'Largura' },
-                  ]).map(({ key, label }) => (
-                    <div key={key}>
-                      <p className="text-xs text-[#9ca3af] mb-1.5 flex items-center gap-1">
-                        {label}
-                        {aiFields.has(key) && <span className="text-[8px] font-bold text-[#6366f1]">IA</span>}
+                  {/* 1.1 Croqui */}
+                  <div className="px-8 pt-7 pb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className={SL} style={{ ...SS, marginBottom: 0 }}>
+                        {tx.bfCroqui}
+                        <span className="ml-2 text-[8px] font-normal text-[#9ca3af] normal-case tracking-normal">({tx.bfCroquiOptional})</span>
                       </p>
-                      <div className="flex items-center gap-1.5">
-                        <input type="number" min={1} max={60} step={0.5} placeholder="—"
-                          value={form[key] ?? ''}
-                          onChange={e => set(key, e.target.value ? Number(e.target.value) : undefined)}
-                          className={`w-full rounded-xl border px-3 py-3 text-[0.9375rem] text-[#1f2937] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#6366f1] ${aiFields.has(key) ? 'border-[#6366f1]/30 bg-[#6366f1]/[0.03]' : 'border-[#e5e7eb] bg-[#f8f9fb]'}`}
-                        />
-                        <span className="text-sm text-[#9ca3af] shrink-0">m</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCroquiHint(h => !h)}
+                        className="text-[#9ca3af] hover:text-[#D1A23A] transition-colors shrink-0"
+                        aria-expanded={showCroquiHint}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4"/>
+                          <path d="M8 7v4M8 5.5v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    {showCroquiHint && (
+                      <div className="flex items-start gap-2 px-3 py-2.5 bg-[#f8f9fb] rounded-xl border border-[#e0e7ff] mb-3">
+                        <p className="text-xs text-[#6b7280] leading-relaxed">
+                          {tx.bfCroquiHint}
+                        </p>
+                      </div>
+                    )}
+                    {!sketchPreview ? (
+                      <label className="block border-2 border-dashed border-[#e5e7eb] rounded-xl cursor-pointer hover:border-[#D1A23A]/30 transition-colors">
+                        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                        <div className="px-6 py-8 text-center">
+                          <p className="text-sm text-[#6b7280] font-medium">{tx.bfCroquiDrop}</p>
+                          <p className="text-xs text-[#9ca3af] mt-1">{tx.bfCroquiAiNote}</p>
+                        </div>
+                      </label>
+                    ) : (
+                      <div className="flex items-center gap-3 p-3 bg-[#f8f9fb] rounded-xl border border-[#e5e7eb]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={sketchPreview} alt="croqui" className="w-14 h-14 rounded-lg object-cover border border-[#e5e7eb] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-[#1a1a1a]">{tx.bfCroquiLoaded}</p>
+                          {analyzeError && <p className="text-[10px] text-red-500 mt-0.5">{analyzeError}</p>}
+                        </div>
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          <button onClick={analyzeSketch} disabled={analyzing}
+                            className="text-xs bg-[#D1A23A] text-white rounded-lg px-3 py-1.5 font-medium hover:bg-[#a07d2e] transition-colors disabled:opacity-40">
+                            {analyzing ? tx.bfCroquiAnalyzing : tx.bfCroquiAnalyze}
+                          </button>
+                          <button onClick={() => { setSketchBase64(null); setSketchPreview(null); setAiFields(new Set()) }}
+                            className="text-xs text-[#9ca3af] hover:text-[#6b7280] transition-colors">{tx.bfCroquiRemove}</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="section-divider" />
+
+                  {/* 1.2 Geometry */}
+                  <div className="px-8 py-7">
+                    <p className={SL} style={SS}>
+                      {tx.bfPlanta}
+                      {(aiFields.has('plantaForma') || aiFields.has('comprimento') || aiFields.has('area') || aiFields.has('peDireito')) && <AiBadge />}
+                    </p>
+                    <div className="space-y-6">
+                      <div>
+                        <label className="form-label">{tx.bfDimensoes} <span className="text-[#9ca3af] font-normal normal-case tracking-normal">({tx.bfDimensoesOptional})</span></label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(['comprimento', 'largura'] as const).map(key => (
+                            <div key={key}>
+                              <p className="text-xs text-[#9ca3af] mb-1.5 flex items-center gap-1">
+                                {key === 'largura' ? tx.bfLargura : tx.bfComprimento}
+                                {aiFields.has(key) && <span className="text-[8px] font-bold text-[#D1A23A]">IA</span>}
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <input type="number" min={1} max={lang === 'en' ? 200 : 60} step={0.5} placeholder="—"
+                                  value={displayDim(form[key])}
+                                  onChange={e => {
+                                    const raw = e.target.value ? Number(e.target.value) : undefined
+                                    set(key, raw != null ? (lang === 'en' ? toM(raw) : raw) : undefined)
+                                  }}
+                                  className={`w-full rounded-xl border px-3 py-3 text-[0.9375rem] text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A] ${aiFields.has(key) ? 'border-[#D1A23A]/30 bg-[#D1A23A]/[0.03]' : 'border-[#e5e7eb] bg-[#f8f9fb]'}`}
+                                />
+                                <span className="text-sm text-[#9ca3af] shrink-0">{dimUnit}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline justify-between mb-0">
+                          <label className="form-label" style={{ marginBottom: 0 }}>{tx.bfAreaAprox}{aiFields.has('area') && <AiBadge />}</label>
+                          {form.comprimento && form.largura && <span className="text-[10px] text-[#D1A23A] font-medium">{tx.bfAutoCalc}</span>}
+                        </div>
+                        <div className="flex items-center gap-4 mt-2.5">
+                          <input type="range" min={15} max={280} step={5} value={form.area}
+                            onChange={e => set('area', Number(e.target.value))} className="flex-1 accent-[#D1A23A]" />
+                          <span className="text-base font-semibold text-[#1a1a1a] w-28 text-right tabular-nums">{displayArea} {areaUnit}</span>
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* 1.3 Pé-direito — obrigatório */}
+                  <hr className="section-divider" />
+                  <div className="px-8 py-7">
+                    <p className={SL} style={SS}>
+                      {tx.bfPeDireito}
+                      <span className="ml-1.5 text-amber-500 text-[9px] font-normal normal-case tracking-normal">*</span>
+                      {(aiFields.has('peDireito') || aiFields.has('alturaPeDireito')) && <AiBadge />}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input type="number"
+                        min={lang === 'en' ? 5 : 1.5}
+                        max={lang === 'en' ? 33 : 10}
+                        step={0.1}
+                        placeholder={tx.bfPeDireitoPlaceholder}
+                        value={form.alturaPeDireito != null ? (lang === 'en' ? parseFloat(toFt(form.alturaPeDireito).toFixed(1)) : form.alturaPeDireito) : ''}
+                        onChange={e => {
+                          const raw = e.target.value ? Number(e.target.value) : undefined
+                          set('alturaPeDireito', raw != null ? (lang === 'en' ? toM(raw) : raw) : undefined)
+                        }}
+                        className={`w-28 rounded-xl border px-3 py-2.5 text-[0.9375rem] text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A] ${aiFields.has('alturaPeDireito') ? 'border-[#D1A23A]/30 bg-[#D1A23A]/[0.03]' : 'border-[#e5e7eb] bg-[#f8f9fb]'}`}
+                      />
+                      <span className="text-sm text-[#9ca3af]">{tx.bfPeDireitoUnit}</span>
+                      {form.alturaPeDireito && <span className="text-[11px] text-[#D1A23A] font-medium">{peDirLabel(form.alturaPeDireito)}</span>}
+                    </div>
+                  </div>
+
+                  {/* 1.4 Fotos do espaço — aparece após pé-direito preenchido */}
+                  <Section visible={showFotos}>
+                    <hr className="section-divider" />
+                    <div className="px-8 py-7">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={SL} style={SS}>{tx.bfFotos}</p>
+                        {fotosCompletas
+                          ? <span className="text-[10px] font-medium text-[#D1A23A] bg-[#D1A23A]/10 px-2 py-0.5 rounded-full">✓</span>
+                          : <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{fotosObrigatorias.filter(id => !fotosCat[id]).length}×</span>
+                        }
+                      </div>
+                      <p className="text-xs text-[#9ca3af] mb-3 -mt-2">{tx.bfFotosNote}</p>
+
+                      <div className="flex items-start gap-2 px-3 py-2.5 bg-[#fffbeb] rounded-xl border border-[#fde68a] mb-4">
+                        <span className="text-amber-500 text-sm shrink-0 leading-tight">!</span>
+                        <p className="text-xs text-[#92400e] leading-relaxed">
+                          {tx.bfFotosAmberNote}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        {FOTO_CATS.map(cat => (
+                          <div key={cat.id} className="space-y-1">
+                            <p className="text-[9px] font-medium text-[#6b7280] leading-tight">{cat.label}</p>
+                            {fotosPreview[cat.id] ? (
+                              <div className="relative">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={fotosPreview[cat.id]} alt={cat.label}
+                                  className="w-full aspect-square rounded-lg object-cover border border-[#e5e7eb]" />
+                                <button onClick={() => removeFoto(cat.id)}
+                                  className="absolute top-1 right-1 w-5 h-5 bg-white/90 rounded-full text-[9px] text-[#9ca3af] flex items-center justify-center hover:text-red-400 transition-colors border border-[#e5e7eb]">✕</button>
+                              </div>
+                            ) : (
+                              <label className={`flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed cursor-pointer transition-colors
+                                ${cat.req ? 'border-amber-200 bg-amber-50/50 hover:border-amber-400' : 'border-[#e5e7eb] bg-[#fafafa] hover:border-[#D1A23A]/30'}`}>
+                                <input type="file" accept="image/*" className="hidden"
+                                  onChange={e => handleFotoChange(cat.id, e)} />
+                                <span className="text-[8px] text-[#9ca3af] mt-0.5">{cat.req ? tx.bfFotoReq : tx.bfCroquiOptional}</span>
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Section>
+
+                  {/* 1.5 Finishes — auto-filled by IA photo analysis */}
+                  <Section visible={showAcabamentos}>
+                    <hr className="section-divider" />
+                    <div className="px-8 py-7">
+                      <p className={SL} style={SS}>{tx.bfAcabamentos}{fotoAnalise && <AiBadge />}</p>
+                      <div className="space-y-6">
+                        <div><label className="form-label">{tx.bfPiso}</label><OptGrid options={[['cimento-queimado', tx.bfCimento],['ceramica', tx.bfCeramica],['madeira', tx.bfMadeira],['vinilico', tx.bfVinilico],['pedra', tx.bfPedra],['outro', tx.bfOutroAcab]] as [PisoTipo, string][]} value={form.pisoTipo} onChange={v => set('pisoTipo', v)} cols={3} /></div>
+                        <div><label className="form-label">{tx.bfParede}</label><OptGrid options={[['reboco-pintado', tx.bfReboco],['tijolo-aparente', tx.bfTijolo],['azulejo', tx.bfAzulejo],['drywall', tx.bfDrywall],['outro', tx.bfOutroAcab]] as [ParedeTipo, string][]} value={form.paredeTipo} onChange={v => set('paredeTipo', v)} cols={3} /></div>
+                        <div><label className="form-label">{tx.bfTeto}</label><OptGrid options={[['laje-aparente', tx.bfLaje],['forro-gesso', tx.bfForroGesso],['forro-madeira', tx.bfForroMadeira],['steel-deck', tx.bfSteelDeck],['outro', tx.bfOutroAcab]] as [TetoTipo, string][]} value={form.tetoTipo} onChange={v => set('tetoTipo', v)} cols={3} /></div>
+                      </div>
+                    </div>
+                  </Section>
+
+                </div>
+
+                {/* CTA → stage 2 */}
+                <div className="mt-4 space-y-2">
+                  {!form.alturaPeDireito && (
+                    <p className="text-[11px] text-center text-amber-600">
+                      {lang === 'pt' ? '* Informe o pé-direito (estimado é suficiente) para continuar.' : '* Ceiling height is required — an estimate is fine.'}
+                    </p>
+                  )}
+                  <button onClick={() => goToStage(2)}
+                    disabled={!form.alturaPeDireito}
+                    className="w-full py-4 rounded-2xl bg-[#1a1a1a] text-white font-semibold text-sm hover:bg-[#333333] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    {tx.bfContinuar}
+                  </button>
+                </div>
+              </>
+
+          </div>
+        )}
+
+        {/* ───────────────────────────────────────────────── STAGE 2 */}
+        {stage === 2 && (
+          <div className="space-y-0">
+            <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden">
+
+              {/* 2.1 Tipo de uso */}
+              <div className="px-8 pt-7 pb-6">
+                <p className={SL} style={SS}>{tx.bfTipoUso}</p>
+                <OptGrid
+                  options={[
+                    ['cafeteria', tx.bfCafe],
+                    ['restaurante', tx.bfRestaurante],
+                    ['sorveteria', tx.bfSorveteria],
+                    ['bar', tx.bfBar],
+                  ] as [TipoUso, string][]}
+                  value={needs.tipoUso} onChange={v => setN('tipoUso', v)} cols={2}
+                />
+              </div>
+
+              <hr className="section-divider" />
+
+              {/* 2.2 Public profile */}
+              <div className="px-8 py-6">
+                <p className={SL} style={SS}>{tx.bfPerfilPublico} <span className="text-[#9ca3af] font-normal normal-case tracking-normal">{tx.bfPerfilPublicoHint}</span></p>
+                <MultiSelect
+                  options={[
+                    ['jovem-casual', tx.bfJovem],['corporativo', tx.bfCorporativo],
+                    ['familia', tx.bfFamilia],['premium', tx.bfPremium],
+                    ['turista', tx.bfTurista],['artistico', tx.bfArtistico],
+                  ] as [PerfilPublico, string][]}
+                  value={needs.perfilPublico}
+                  onChange={v => setN('perfilPublico', v)}
+                  cols={2}
+                />
+              </div>
+
+              <hr className="section-divider" />
+
+              {/* 2.3 Brand */}
+              <div className="px-8 py-6">
+                <p className={SL} style={SS}>{tx.bfMarca}</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">{tx.bfNomeMarca}</label>
+                    <input type="text" placeholder={tx.bfNomeMarcaPlaceholder} value={needs.nomeMarca}
+                      onChange={e => setN('nomeMarca', e.target.value)}
+                      className="w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A]" />
+                  </div>
+                  <div>
+                    <label className="form-label">{tx.bfRedeSocial}</label>
+                    <input type="text" placeholder={tx.bfRedeSocialPlaceholder} value={needs.redeSocial}
+                      onChange={e => setN('redeSocial', e.target.value)}
+                      className="w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A]" />
+                  </div>
+                  <div>
+                    <label className="form-label">{tx.bfPrimeiraUnidade}</label>
+                    <OptGrid
+                      options={[['sim', tx.bfPrimeiraUnidadeSim], ['nao', tx.bfPrimeiraUnidadeNao]] as ['sim' | 'nao', string][]}
+                      value={needs.primeiraUnidade} onChange={v => setN('primeiraUnidade', v)} cols={2}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-baseline justify-between mb-0">
-                  <label className="form-label" style={{ marginBottom: 0 }}>
-                    Área
-                    {aiFields.has('area') && <AiBadge />}
-                  </label>
-                  {form.comprimento && form.largura && (
-                    <span className="text-[10px] text-[#6366f1] font-medium">calculado automaticamente</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-4 mt-2.5">
-                  <input type="range" min={15} max={280} step={5} value={form.area}
-                    onChange={e => set('area', Number(e.target.value))} className="flex-1 accent-[#6366f1]" />
-                  <span className="text-base font-semibold text-[#1f2937] w-24 text-right tabular-nums">{form.area} m²</span>
+              <hr className="section-divider" />
+
+              {/* 2.4 Functional */}
+              <div className="px-8 py-6">
+                <p className={SL} style={SS}>{tx.bfDemandaFuncional}</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">{tx.bfCapacidade}</label>
+                    <input type="text" placeholder={tx.bfCapacidadePlaceholder} value={needs.capacidade}
+                      onChange={e => setN('capacidade', e.target.value)}
+                      className="w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A]" />
+                  </div>
+                  <div>
+                    <label className="form-label">{tx.bfConceito}</label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {([
+                        [tx.bfMinimalista, 'Minimalista'],
+                        [tx.bfIndustrial, 'Industrial'],
+                        [tx.bfAconchegante, 'Aconchegante'],
+                        [tx.bfContemporaneo, 'Contemporâneo'],
+                      ] as [string, string][]).map(([label, key]) => {
+                        const on = needs.palavrasChave.includes(key)
+                        return (
+                          <button key={key} type="button"
+                            onClick={() => setN('palavrasChave', on ? needs.palavrasChave.filter(k => k !== key) : [...needs.palavrasChave, key])}
+                            className={`opt-btn${on ? ' selected' : ''}`}>
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {needs.palavrasChave.filter(k => !['Minimalista','Industrial','Aconchegante','Contemporâneo'].includes(k)).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {needs.palavrasChave
+                          .filter(k => !['Minimalista','Industrial','Aconchegante','Contemporâneo'].includes(k))
+                          .map((k, i) => (
+                            <span key={i} className="flex items-center gap-1 px-3 py-1 bg-[#eef2ff] text-[#D1A23A] text-xs font-medium rounded-full">
+                              {k}
+                              <button onClick={() => setN('palavrasChave', needs.palavrasChave.filter(x => x !== k))} className="ml-1 text-[#D1A23A]/60 hover:text-[#D1A23A] transition-colors">✕</button>
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input type="text" value={kwInput} onChange={e => setKwInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addKw() }}
+                        placeholder={tx.bfConceitoPlaceholder}
+                        className="flex-1 rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-3 py-2.5 text-sm text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A]" />
+                      {kwInput.trim() && (
+                        <button onClick={addKw} className="px-3 py-2 bg-[#D1A23A] text-white rounded-xl text-sm font-medium hover:bg-[#a07d2e] transition-colors">+</button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="form-label">
-                  Pé-direito
-                  {(aiFields.has('peDireito') || aiFields.has('alturaPeDireito')) && <AiBadge />}
-                </label>
-                <div className="flex items-center gap-2 mb-2">
-                  <input type="number" min={1.5} max={10} step={0.1} placeholder="—"
-                    value={form.alturaPeDireito ?? ''}
-                    onChange={e => set('alturaPeDireito', e.target.value ? Number(e.target.value) : undefined)}
-                    className={`w-24 rounded-xl border px-3 py-2.5 text-[0.9375rem] text-[#1f2937] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#6366f1] ${aiFields.has('alturaPeDireito') ? 'border-[#6366f1]/30 bg-[#6366f1]/[0.03]' : 'border-[#e5e7eb] bg-[#f8f9fb]'}`}
-                  />
-                  <span className="text-sm text-[#9ca3af]">m</span>
-                  {form.alturaPeDireito && (
-                    <span className="text-[11px] text-[#6366f1] font-medium">
-                      {form.alturaPeDireito < 2.4 ? 'baixo' : form.alturaPeDireito <= 3.35 ? 'médio' : 'alto'}
-                    </span>
-                  )}
-                </div>
-                {!form.alturaPeDireito && (
-                  <div className="flex flex-col gap-2">
-                    {([['baixo', 'Baixo  — até 2,4m'],['medio', 'Médio  — 2,4 a 3,35m'],['alto', 'Alto  — acima de 3,35m']] as [PeDireito, string][]).map(([val, label]) => (
-                      <button key={val} type="button" onClick={() => set('peDireito', val)}
-                        className={`opt-btn${form.peDireito === val ? ' selected' : ''}`}>
-                        {label}
-                        {aiFields.has('peDireito') && form.peDireito === val && <span className="ml-1.5 text-[8px] font-bold bg-[#6366f1]/15 text-[#6366f1] px-1 py-0.5 rounded">IA</span>}
-                      </button>
+              <hr className="section-divider" />
+
+              {/* 2.5 References */}
+              <div className="px-8 py-6">
+                <p className={SL} style={SS}>{tx.bfReferencias} <span className="text-[#9ca3af] font-normal normal-case tracking-normal">({tx.bfReferenciasOptional})</span></p>
+                <p className="text-xs text-[#9ca3af] mb-4 -mt-3">{tx.bfReferenciasHint}</p>
+                {needs.referencias.length > 0 && (
+                  <div className="flex gap-2 flex-wrap mb-3">
+                    {needs.referencias.map((src, i) => (
+                      <div key={i} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="" className="w-16 h-16 rounded-lg object-cover border border-[#e5e7eb]" />
+                        <button onClick={() => setN('referencias', needs.referencias.filter((_, j) => j !== i))}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-white border border-[#e5e7eb] rounded-full text-[8px] text-[#9ca3af] flex items-center justify-center hover:text-red-400 transition-colors">✕</button>
+                      </div>
                     ))}
                   </div>
                 )}
+                <label className="flex items-center justify-center gap-2 border border-dashed border-[#e5e7eb] rounded-xl py-3 cursor-pointer hover:border-[#D1A23A]/30 transition-colors">
+                  <input type="file" accept="image/*" onChange={handleRefChange} className="hidden" />
+                  <span className="text-sm text-[#6b7280]">{tx.bfReferenciasAdd}</span>
+                </label>
               </div>
+
+              <hr className="section-divider" />
+
+              {/* 2.6 Restrictions */}
+              <div className="px-8 py-6">
+                <p className={SL} style={SS}>{tx.bfRestricoes}</p>
+                <div className="space-y-5">
+                  <div>
+                    <label className="form-label">{tx.bfOrcamento}</label>
+                    <OptGrid
+                      options={[['ate50k', tx.bfAte50k],['50k-150k', tx.bf50k150k],['150k-300k', tx.bf150k300k],['acima300k', tx.bfAcima300k]] as [OrcamentoProjeto, string][]}
+                      value={needs.orcamento} onChange={v => setN('orcamento', v)} cols={2}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">{tx.bfPrazo}</label>
+                    <OptGrid
+                      options={[['urgente', tx.bfUrgente],['1-3-meses', tx.bf1a3meses],['3-6-meses', tx.bf3a6meses],['sem-prazo', tx.bfSemPrazo]] as [PrazoProjeto, string][]}
+                      value={needs.prazo} onChange={v => setN('prazo', v)} cols={2}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">{tx.bfRestricoesLabel} <span className="text-[#9ca3af] font-normal normal-case tracking-normal">({tx.bfRestricoesOptional})</span></label>
+                    <textarea placeholder={tx.bfRestricoesPlaceholder}
+                      value={needs.restricoes} onChange={e => setN('restricoes', e.target.value)} rows={3}
+                      className="w-full rounded-xl border border-[#e5e7eb] bg-[#f8f9fb] px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#9ca3af] focus:outline-none focus:ring-1 focus:ring-[#D1A23A] resize-none" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* CTAs */}
+            <div className="mt-4 space-y-3">
+
+              {/* validation hint */}
+              {!fotosCompletas && (
+                <div className="flex items-start gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <span className="text-amber-500 shrink-0">⚠</span>
+                  <p className="text-xs text-amber-700">
+                    {tx.bfFotosObrigatorias}
+                    <button onClick={() => goToStage(1)} className="ml-1 underline font-medium">{tx.bfAddNow}</button>
+                  </p>
+                </div>
+              )}
+
+              {/* Primary: project request */}
+              <button onClick={solicitarProjeto}
+                disabled={!fotosCompletas || !needs.tipoUso}
+                className="w-full py-4 rounded-2xl bg-[#1a1a1a] text-white font-semibold text-sm hover:bg-[#333333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-3">
+                <span>{tx.bfSolicitar}</span>
+                <span className="text-[#9ca3af]">→</span>
+              </button>
 
             </div>
           </div>
-
-          {/* Bloco 2 — Aberturas */}
-          <Section visible={showAberturas}>
-            <hr className="section-divider" />
-            <div className="px-8 py-7">
-              <p className={SECTION_LABEL} style={SECTION_STYLE}>
-                Aberturas
-                {(aiFields.has('entradaPos') || aiFields.has('janelasPos') || aiFields.has('elementosFixos')) && <AiBadge />}
-              </p>
-              <div className="space-y-6">
-
-                <div>
-                  <label className="form-label">Posição da entrada principal</label>
-                  <OptGrid
-                    options={[['frente','Frente'],['lateral-esq','Lateral esq.'],['lateral-dir','Lateral dir.'],['fundo','Fundo']] as [EntradaPos, string][]}
-                    value={form.entradaPos} onChange={v => set('entradaPos', v)}
-                    aiFields={aiFields} fieldKey="entradaPos"
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label">Posição das janelas</label>
-                  <div className="flex flex-col gap-2">
-                    {([
-                      ['so-frente', 'Só na frente'],['frente-lateral', 'Frente + lateral'],
-                      ['so-lateral', 'Só lateral'],['sem-janelas', 'Sem janelas'],
-                    ] as [JanelasPos, string][]).map(([val, label]) => (
-                      <button key={val} type="button" onClick={() => set('janelasPos', val)}
-                        className={`opt-btn${form.janelasPos === val ? ' selected' : ''}`}>
-                        {label}
-                        {aiFields.has('janelasPos') && form.janelasPos === val && <span className="ml-1.5 text-[8px] font-bold bg-[#6366f1]/15 text-[#6366f1] px-1 py-0.5 rounded">IA</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <MiniList<AmbienteInterno>
-                  label="Ambientes internos"
-                  items={form.ambientesInternos}
-                  onRemove={i => setForm(f => ({ ...f, ambientesInternos: f.ambientesInternos.filter((_, j) => j !== i) }))}
-                  renderChip={a => `${a.nome || 'Ambiente'} · ${a.posicao}${a.largura && a.profundidade ? ` · ${a.largura}×${a.profundidade}m` : ''}`}
-                  adding={addingRoom}
-                  onAdd={() => setAddingRoom(true)}
-                  onCancel={() => setAddingRoom(false)}
-                  onCommit={commitRoom}
-                  addLabel="+ Adicionar ambiente interno"
-                >
-                  <input type="text" placeholder="Nome (ex: Banheiro, Copa)" value={newRoomNome}
-                    onChange={e => setNewRoomNome(e.target.value)}
-                    className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 outline-none focus:border-[#6366f1]" />
-                  <select value={newRoomPos} onChange={e => setNewRoomPos(e.target.value as AmbienteInterno['posicao'])}
-                    className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#6366f1]">
-                    <option value="">Posição no espaço</option>
-                    <option value="canto-sw">Canto frente-esq</option>
-                    <option value="canto-se">Canto frente-dir</option>
-                    <option value="canto-nw">Canto fundo-esq</option>
-                    <option value="canto-ne">Canto fundo-dir</option>
-                    <option value="fundo-centro">Fundo centro</option>
-                    <option value="lateral">Lateral</option>
-                  </select>
-                  <div className="flex gap-2">
-                    <NumInput placeholder="Largura (m)" value={newRoomLarg} onChange={setNewRoomLarg} />
-                    <NumInput placeholder="Profund. (m)" value={newRoomProf} onChange={setNewRoomProf} />
-                  </div>
-                </MiniList>
-
-                {/* Janelas extras */}
-                <MiniList<JanelaCustom>
-                  label="Janelas extras"
-                  items={form.janelasCustom}
-                  onRemove={i => setForm(f => ({ ...f, janelasCustom: f.janelasCustom.filter((_, j) => j !== i) }))}
-                  renderChip={j => `${j.parede} · ${j.largura}×${j.altura}m`}
-                  adding={addingJanela}
-                  onAdd={() => setAddingJanela(true)}
-                  onCancel={() => setAddingJanela(false)}
-                  onCommit={commitJanela}
-                  addLabel="+ Adicionar janela"
-                >
-                  <WallSelect value={newJanela.parede} onChange={v => setNewJanela(p => ({ ...p, parede: v as EntradaPos }))} />
-                  <PosHSelect value={newJanela.posH} onChange={v => setNewJanela(p => ({ ...p, posH: v }))} />
-                  <div className="flex gap-2">
-                    <NumInput placeholder="Largura (m)" value={newJanela.largura} onChange={v => setNewJanela(p => ({ ...p, largura: v }))} />
-                    <NumInput placeholder="Altura (m)" value={newJanela.altura} onChange={v => setNewJanela(p => ({ ...p, altura: v }))} />
-                    <NumInput placeholder="Peitoril (m)" value={newJanela.peitoril} onChange={v => setNewJanela(p => ({ ...p, peitoril: v }))} />
-                  </div>
-                </MiniList>
-
-                {/* Portas internas */}
-                <MiniList<PortaInterna>
-                  label="Portas internas"
-                  items={form.portasInternas}
-                  onRemove={i => setForm(f => ({ ...f, portasInternas: f.portasInternas.filter((_, j) => j !== i) }))}
-                  renderChip={p => `${p.parede} · ${p.largura}m`}
-                  adding={addingPorta}
-                  onAdd={() => setAddingPorta(true)}
-                  onCancel={() => setAddingPorta(false)}
-                  onCommit={commitPorta}
-                  addLabel="+ Adicionar porta interna"
-                >
-                  <WallSelect value={newPorta.parede} onChange={v => setNewPorta(p => ({ ...p, parede: v as EntradaPos }))} />
-                  <PosHSelect value={newPorta.posH} onChange={v => setNewPorta(p => ({ ...p, posH: v }))} />
-                  <NumInput placeholder="Largura (m)" value={newPorta.largura} onChange={v => setNewPorta(p => ({ ...p, largura: v }))} />
-                </MiniList>
-
-                {/* Pilares */}
-                <MiniList<PilarCustom>
-                  label="Pilares"
-                  items={form.pilaresCustom}
-                  onRemove={i => setForm(f => ({ ...f, pilaresCustom: f.pilaresCustom.filter((_, j) => j !== i) }))}
-                  renderChip={p => `X:${p.posX}m Y:${p.posY}m ⌀${p.diametro}m`}
-                  adding={addingPilar}
-                  onAdd={() => setAddingPilar(true)}
-                  onCancel={() => setAddingPilar(false)}
-                  onCommit={commitPilar}
-                  addLabel="+ Adicionar pilar"
-                >
-                  <div className="flex gap-2">
-                    <NumInput placeholder="Pos X (m da esq)" value={newPilar.posX} onChange={v => setNewPilar(p => ({ ...p, posX: v }))} />
-                    <NumInput placeholder="Pos Y (m da frente)" value={newPilar.posY} onChange={v => setNewPilar(p => ({ ...p, posY: v }))} />
-                    <NumInput placeholder="Diâm. (m)" value={newPilar.diametro} onChange={v => setNewPilar(p => ({ ...p, diametro: v }))} />
-                  </div>
-                </MiniList>
-
-                {/* Móveis fixos */}
-                <MiniList<MovelFixo>
-                  label="Móveis fixos"
-                  items={form.moveisFixos}
-                  onRemove={i => setForm(f => ({ ...f, moveisFixos: f.moveisFixos.filter((_, j) => j !== i) }))}
-                  renderChip={m => `${m.tipo} · ${m.parede} · ${m.largura}×${m.profundidade}m`}
-                  adding={addingMovel}
-                  onAdd={() => setAddingMovel(true)}
-                  onCancel={() => setAddingMovel(false)}
-                  onCommit={commitMovel}
-                  addLabel="+ Adicionar móvel fixo"
-                >
-                  <select value={newMovel.tipo} onChange={e => setNewMovel(p => ({ ...p, tipo: e.target.value as MovelTipo }))}
-                    className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#6366f1]">
-                    <option value="bancada">Bancada</option>
-                    <option value="balcao">Balcão</option>
-                    <option value="prateleira">Prateleira</option>
-                    <option value="ilha">Ilha central</option>
-                  </select>
-                  <select value={newMovel.parede} onChange={e => setNewMovel(p => ({ ...p, parede: e.target.value as EntradaPos | 'centro' }))}
-                    className="w-full text-sm border border-[#e5e7eb] rounded-lg px-3 py-2 bg-white outline-none focus:border-[#6366f1]">
-                    <option value="">Posição</option>
-                    <option value="frente">Parede frente</option>
-                    <option value="fundo">Parede fundo</option>
-                    <option value="lateral-esq">Lateral esq.</option>
-                    <option value="lateral-dir">Lateral dir.</option>
-                    <option value="centro">Centro (ilha)</option>
-                  </select>
-                  {newMovel.parede !== 'centro' && newMovel.parede !== '' && (
-                    <PosHSelect value={newMovel.posH} onChange={v => setNewMovel(p => ({ ...p, posH: v }))} />
-                  )}
-                  <div className="flex gap-2">
-                    <NumInput placeholder="Largura (m)" value={newMovel.largura} onChange={v => setNewMovel(p => ({ ...p, largura: v }))} />
-                    <NumInput placeholder="Profund. (m)" value={newMovel.profundidade} onChange={v => setNewMovel(p => ({ ...p, profundidade: v }))} />
-                    <NumInput placeholder="Altura (m)" value={newMovel.altura} onChange={v => setNewMovel(p => ({ ...p, altura: v }))} />
-                  </div>
-                </MiniList>
-
-                {/* Escadas */}
-                <MiniList<EscadaCustom>
-                  label="Escadas"
-                  items={form.escadasCustom}
-                  onRemove={i => setForm(f => ({ ...f, escadasCustom: f.escadasCustom.filter((_, j) => j !== i) }))}
-                  renderChip={e => `${e.parede} · ${e.posicaoH} · ${e.largura}m`}
-                  adding={addingEscada}
-                  onAdd={() => setAddingEscada(true)}
-                  onCancel={() => setAddingEscada(false)}
-                  onCommit={commitEscada}
-                  addLabel="+ Adicionar lance de escada"
-                >
-                  <WallSelect value={newEscada.parede} onChange={v => setNewEscada(p => ({ ...p, parede: v as EntradaPos }))} />
-                  <PosHSelect value={newEscada.posH} onChange={v => setNewEscada(p => ({ ...p, posH: v }))} />
-                  <NumInput placeholder="Largura (m)" value={newEscada.largura} onChange={v => setNewEscada(p => ({ ...p, largura: v }))} />
-                </MiniList>
-
-                <div>
-                  <label className="form-label">
-                    Elementos fixos <span className="text-[#9ca3af] font-normal normal-case tracking-normal">(selecione todos)</span>
-                    {aiFields.has('elementosFixos') && <AiBadge />}
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([['pilares','Pilares'],['desnivel','Desnível'],['mezanino','Mezanino']] as [ElementoFixo, string][]).map(([val, label]) => (
-                      <button key={val} type="button" onClick={() => toggleElemento(val)}
-                        className={`opt-btn${form.elementosFixos.includes(val) ? ' selected' : ''}`}>{label}</button>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </Section>
-
-          {/* Bloco 3 — Acabamentos + botão 3D */}
-          <Section visible={showAcabamentos}>
-            <hr className="section-divider" />
-            <div className="px-8 py-7">
-              <p className={SECTION_LABEL} style={SECTION_STYLE}>Acabamentos existentes</p>
-              <div className="space-y-6">
-
-                <div>
-                  <label className="form-label">Piso</label>
-                  <OptGrid options={[['cimento-queimado','Cimento queimado'],['ceramica','Cerâmica'],['madeira','Madeira'],['vinilico','Vinílico'],['pedra','Pedra'],['outro','Outro']] as [PisoTipo, string][]}
-                    value={form.pisoTipo} onChange={v => set('pisoTipo', v)} cols={3} />
-                </div>
-
-                <div>
-                  <label className="form-label">Paredes</label>
-                  <OptGrid options={[['reboco-pintado','Reboco pintado'],['tijolo-aparente','Tijolo aparente'],['azulejo','Azulejo'],['drywall','Drywall'],['outro','Outro']] as [ParedeTipo, string][]}
-                    value={form.paredeTipo} onChange={v => set('paredeTipo', v)} cols={3} />
-                </div>
-
-                <div>
-                  <label className="form-label">Teto</label>
-                  <OptGrid options={[['laje-aparente','Laje aparente'],['forro-gesso','Forro de gesso'],['forro-madeira','Forro de madeira'],['steel-deck','Steel deck'],['outro','Outro']] as [TetoTipo, string][]}
-                    value={form.tetoTipo} onChange={v => set('tetoTipo', v)} cols={3} />
-                </div>
-
-              </div>
-            </div>
-
-            {/* CTA modelo 3D */}
-            <div className="px-8 pb-8 space-y-3">
-              <p className={SECTION_LABEL} style={SECTION_STYLE}>Modelo 3D</p>
-              <button type="button" onClick={handleGerarModelo} disabled={modelLoading}
-                className="w-full py-3.5 rounded-xl bg-[#1f2937] text-white font-semibold text-sm hover:bg-[#111827] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                {modelLoading ? 'Gerando modelo…' : 'Gerar modelo 3D'}
-              </button>
-              {modelError && <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{modelError}</p>}
-              {modelImages && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-3">
-                    <ViewCard title="Perspectiva 1" src={modelImages.perspective} aspectClass="aspect-[4/3]" />
-                    <ViewCard title="Perspectiva 2" src={modelImages.topDown} aspectClass="aspect-[4/3]" />
-                  </div>
-                  {modelImages.planta && (
-                    <ViewCard title="Planta Baixa" src={modelImages.planta} aspectClass="aspect-square" />
-                  )}
-                  <button type="button" onClick={handleGerarModelo} disabled={modelLoading}
-                    className="w-full py-3 rounded-xl border border-[#e5e7eb] text-[#6b7280] font-semibold text-sm hover:bg-[#f8f9fb] transition-colors disabled:opacity-40">
-                    Regerar modelo
-                  </button>
-                </div>
-              )}
-            </div>
-          </Section>
-
-        </div>
-
-        {!sketchPreview && (
-          <p className="mt-4 text-center">
-            <button type="button" onClick={() => setStep('upload')}
-              className="text-sm text-[#9ca3af] hover:text-[#6b7280] underline underline-offset-2 transition-colors">
-              ← Croqui de planta
-            </button>
-          </p>
         )}
 
-        <p className="mt-4 text-center text-sm text-[#9ca3af]">Otelie · gerador de ambientes</p>
+        {/* ───────────────────────────────────────────────── STAGE 3 */}
+        {stage === 3 && (
+          <div>
+
+            {/* ── loading: submitting project ── */}
+            {solicitandoProjeto && (
+              <div className="bg-white rounded-2xl border border-[#e5e7eb] px-8 py-16 flex flex-col items-center gap-6">
+                <div className="flex gap-2">
+                  {['#1a1a1a','#6b7280','#d1d5db'].map((c, i) => (
+                    <div key={i} className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ backgroundColor: c, animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-[#1a1a1a]">{lang === 'pt' ? 'Enviando briefing para a OTELIE…' : 'Sending briefing to OTELIE…'}</p>
+                  <p className="text-xs text-[#9ca3af]">{lang === 'pt' ? 'Fotos · levantamento · referências' : 'Photos · survey · references'}</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── loading: generating AI concept ── */}
+            {gerandoConcept && (
+              <div className="bg-white rounded-2xl border border-[#e5e7eb] px-8 py-16 flex flex-col items-center gap-6">
+                <div className="flex gap-2">
+                  {['#D1A23A','#a5b4fc','#e0e7ff'].map((c, i) => (
+                    <div key={i} className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ backgroundColor: c, animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-[#1a1a1a]">{lang === 'pt' ? 'OTELIE está criando seu Concept Redesign™' : 'OTELIE is building your Concept Redesign™'}</p>
+                  <p className="text-xs text-[#9ca3af]">{lang === 'pt' ? 'Nova Atmosfera · Ritmo Visual · Presença Emocional · Sensory Concept' : 'New Atmosphere · Visual Rhythm · Emotional Presence · Sensory Concept'}</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums text-[#D1A23A]">{elapsed}s</p>
+              </div>
+            )}
+
+            {/* ── success: project submitted ── */}
+            {projetoId && !solicitandoProjeto && (
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl border border-[#e5e7eb] px-8 py-12 text-center space-y-6">
+                  <div className="w-14 h-14 rounded-full bg-[#D1A23A]/15 flex items-center justify-center mx-auto text-2xl" style={{ color: '#D1A23A' }}>
+                    ✓
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-bold tracking-[0.25em] uppercase text-[#D1A23A]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>{tx.bfSuccessTag}</p>
+                    <h2 className="text-xl font-bold text-[#1a1a1a]">{tx.bfSuccessTitle}</h2>
+                    <p className="text-sm text-[#6b7280] leading-relaxed max-w-xs mx-auto">
+                      {tx.bfSuccessMsg}
+                    </p>
+                  </div>
+                  <div className="bg-[#f8f9fb] rounded-xl px-4 py-3 text-left space-y-0.5 inline-block w-full">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>{tx.bfSuccessRef}</p>
+                    <p className="text-sm font-mono text-[#1a1a1a] break-all">{projetoId}</p>
+                  </div>
+                  {/* Status tracker */}
+                  <div className="space-y-3 text-left">
+                    {([
+                      { label: tx.bfSuccessStep1, done: true,  active: false },
+                      { label: tx.bfSuccessStep2, done: false, active: true  },
+                      { label: tx.bfSuccessStep3, done: false, active: false },
+                    ]).map((step, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors
+                          ${step.done ? 'bg-[#1a1a1a] text-white' : step.active ? 'bg-[#D1A23A] text-white' : 'bg-[#f3f4f6] text-[#9ca3af]'}`}>
+                          {step.done ? '✓' : i + 1}
+                        </div>
+                        <span className={`text-sm ${step.done ? 'text-[#6b7280]' : step.active ? 'text-[#1a1a1a] font-medium' : 'text-[#9ca3af]'}`}>
+                          {step.label}
+                        </span>
+                        {step.active && (
+                          <span className="ml-auto text-[9px] font-bold text-[#D1A23A] bg-[#eef2ff] px-2 py-0.5 rounded-full" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>{lang === 'pt' ? 'EM ANDAMENTO' : 'IN PROGRESS'}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* PDF download */}
+                {BriefingDownloadButton && (
+                  <BriefingDownloadButton
+                    data={{
+                      projetoId: projetoId!,
+                      createdAt: new Date().toLocaleDateString(lang === 'pt' ? 'pt-BR' : 'en-US'),
+                      lang,
+                      area: form.area,
+                      comprimento: form.comprimento,
+                      largura: form.largura,
+                      alturaPeDireito: form.alturaPeDireito,
+                      pisoTipo: form.pisoTipo,
+                      paredeTipo: form.paredeTipo,
+                      tetoTipo: form.tetoTipo,
+                      fotosEnviadas: Object.keys(fotosCat),
+                      fotosBase64: Object.fromEntries(Object.entries(fotosPreview)),
+                      tipoUso: needs.tipoUso,
+                      nomeMarca: needs.nomeMarca,
+                      redeSocial: needs.redeSocial,
+                      primeiraUnidade: needs.primeiraUnidade,
+                      perfilPublico: needs.perfilPublico,
+                      capacidade: needs.capacidade,
+                      palavrasChave: needs.palavrasChave,
+                      orcamento: needs.orcamento,
+                      prazo: needs.prazo,
+                      restricoes: needs.restricoes,
+                    }}
+                    label={lang === 'pt' ? 'Baixar resumo em PDF' : 'Download briefing PDF'}
+                    loadingLabel={lang === 'pt' ? 'Gerando PDF…' : 'Generating PDF…'}
+                  />
+                )}
+
+                <div className="flex gap-3">
+                  <button onClick={() => { setProjetoId(null); goToStage(2) }}
+                    className="flex-1 py-3 border border-[#e5e7eb] rounded-xl text-sm text-[#6b7280] font-medium hover:bg-[#f8f9fb] transition-colors">
+                    ← {lang === 'pt' ? 'Ajustar brief' : 'Edit brief'}
+                  </button>
+                  <button onClick={() => { setProjetoId(null); goToStage(1) }}
+                    className="flex-1 py-3 border border-[#e5e7eb] rounded-xl text-sm text-[#6b7280] font-medium hover:bg-[#f8f9fb] transition-colors">
+                    {lang === 'pt' ? 'Novo projeto' : 'New project'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── error: submission failed ── */}
+            {solicitacaoErro && !solicitandoProjeto && !projetoId && (
+              <div className="bg-white rounded-2xl border border-[#e5e7eb] px-8 py-10 text-center space-y-4">
+                <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{solicitacaoErro}</p>
+                <button onClick={solicitarProjeto} className="px-6 py-3 bg-[#1a1a1a] text-white rounded-xl text-sm font-medium hover:bg-[#333333] transition-colors">{lang === 'pt' ? 'Tentar novamente' : 'Try again'}</button>
+              </div>
+            )}
+
+            {/* ── error: AI concept failed ── */}
+            {conceptError && !gerandoConcept && !projetoId && (
+              <div className="bg-white rounded-2xl border border-[#e5e7eb] px-8 py-10 text-center space-y-4">
+                <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{conceptError}</p>
+                <button onClick={gerarConcept} className="px-6 py-3 bg-[#D1A23A] text-white rounded-xl text-sm font-medium hover:bg-[#a07d2e] transition-colors">{lang === 'pt' ? 'Tentar novamente' : 'Try again'}</button>
+              </div>
+            )}
+
+            {/* ── AI concept result ── */}
+            {concept && !gerandoConcept && !projetoId && (
+              <div className="space-y-4">
+                <div className="text-center py-4">
+                  <p className="text-[9px] font-bold tracking-[0.3em] text-[#9ca3af] uppercase mb-1" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>OTELIE · Preview com IA</p>
+                  <h2 className="text-xl font-bold text-[#1a1a1a]">Concept Redesign™</h2>
+                </div>
+
+                <ConceptDisplay
+                  concept={concept}
+                  viewerProps={viewerProps}
+                  capturedViews={capturedViews}
+                  existente={form as unknown as Record<string, unknown>}
+                  necessidades={needs as unknown as Record<string, unknown>}
+                />
+
+                {/* upsell to real project */}
+                <div className="bg-[#f8f9fb] border border-[#e5e7eb] rounded-2xl px-6 py-5 space-y-3">
+                  <p className="text-sm font-semibold text-[#1a1a1a]">{lang === 'pt' ? 'Gostou do concept preview?' : 'Liked the concept preview?'}</p>
+                  <p className="text-xs text-[#6b7280]">{lang === 'pt' ? 'Solicite o concept inicial completo — diretrizes, paleta, layout e referências visuais — entregue pela equipe OTELIE em até 24h.' : 'Request the full initial concept — guidelines, palette, layout and visual references — delivered by the OTELIE team within 24h.'}</p>
+                  <button onClick={solicitarProjeto}
+                    disabled={!fotosCompletas || !needs.tipoUso}
+                    className="w-full py-3 rounded-xl bg-[#1a1a1a] text-white font-semibold text-sm hover:bg-[#333333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    {tx.bfSolicitar} →
+                  </button>
+                  {!fotosCompletas && <p className="text-[10px] text-amber-600 text-center">{tx.bfFotosObrigatorias}</p>}
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={gerarConcept}
+                    className="flex-1 py-3 border border-[#e5e7eb] rounded-xl text-sm text-[#6b7280] font-medium hover:bg-[#f8f9fb] transition-colors">
+                    {lang === 'pt' ? 'Regenerar preview' : 'Regenerate preview'}
+                  </button>
+                  <button onClick={() => goToStage(2)}
+                    className="flex-1 py-3 border border-[#D1A23A]/30 rounded-xl text-sm text-[#D1A23A] font-medium hover:bg-[#D1A23A]/[0.04] transition-colors">
+                    ← {lang === 'pt' ? 'Ajustar brief' : 'Edit brief'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        <p className="mt-10 text-center text-xs text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono, Inter, sans-serif)' }}>OTELIE · Concept Redesign™</p>
       </div>
     </main>
   )
